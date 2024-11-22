@@ -8,3 +8,7 @@ Any C++ compilation unit in this directory will build into a separate binary.
 == Libraries and configuration
 
 Any source uses the same setup that is configured globally on the cmake file.
+
+=== precompiled header
+
+the file `all.hpp` is added as precompiled header and includes pretty much every thing from the standard library.
