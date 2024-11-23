@@ -13,14 +13,11 @@ target_precompile_headers(test_setup INTERFACE all.hpp)
 
 file(GLOB SOURCES LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} *.cpp)
 
-find_package(Msgpack)
-find_package(boost CONFIG REQUIRED COMPONENTS asio)
-
 message(DEBUG "Found sources ${SOURCES}")
 foreach(SOURCE IN LISTS SOURCES)
     string(REGEX REPLACE "(.*)\.cpp$" "\\1" NAME ${SOURCE})
     message(STATUS "Adding target ${NAME}")
     add_executable("${NAME}" "${SOURCE}")
     target_compile_features("${NAME}" PRIVATE cxx_std_23)
-    target_link_libraries("${NAME}" PRIVATE test_setup Msgpack::Msgpack Boost::boost)
+    target_link_libraries("${NAME}" PRIVATE test_setup)
 endforeach()
