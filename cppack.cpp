@@ -2,7 +2,6 @@
 #include <iostream>
 #include <string>
 #include <cctype>
-#include <boost/asio.hpp>
 #include "./msgpack.hpp"
 
 namespace message

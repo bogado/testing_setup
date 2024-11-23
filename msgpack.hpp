@@ -61,8 +61,8 @@ struct bounds {
 };
 
 static constexpr auto& boundaries() {
-    static constexpr auto result = std::array{ bounds{ .type_id = 0x00, .extent = 0x7F },
-        bounds{ .type_id = 0x80, .extent = 0x0F, .min = 0, .max = 0xF },
+    static constexpr auto result = std::array{ bounds{ .type_id = 0x00, .extent = 0x7F , .min = 0, .max = 0x7F },
+        bounds{ .type_id = 0x80, .extent = 0x0F},
         bounds{ .type_id = 0x90, .extent = 0x0F },
         bounds{ .type_id = 0xA0, .extent = 0x1F },
         bounds{ .type_id = 0xC0 },
@@ -97,7 +97,7 @@ static constexpr auto& boundaries() {
         bounds{ .type_id = 0xDD, .size = 2 },
         bounds{ .type_id = 0xDE, .size = 1 },
         bounds{ .type_id = 0xDF, .size = 2 },
-        bounds{ .type_id = 0xE0, .extent = 0x1F } };
+        bounds{ .type_id = 0xE0, .extent = 0x1F , .min =-0x20, .max=-1} };
     return result;
 }
 
@@ -128,9 +128,9 @@ static constexpr auto value_of(std::uint8_t data)
 }
 
 constexpr auto format_for (const std::integral auto value) { 
-    for (auto bound : { bounds_of(type::POSITIVE_FIX_INT), bounds_of(type::NEGATIVE_FIX_INT) }) {
+    for (const auto& bound : { bounds_of(type::POSITIVE_FIX_INT), bounds_of(type::NEGATIVE_FIX_INT) }) {
         if (value >= bound.min && value <= bound.max) {
-            return bounds{static_cast<uint8_t>(value)};
+            return bounds{.type_id =  static_cast<uint8_t>(value)};
         }
     }
     constexpr auto is_signed = std::is_signed_v<decltype(value)>;
@@ -163,9 +163,9 @@ struct msgpack
 
     bool operator()(std::integral auto value)
     {
-        auto [bound, fixed] = format_for(value);
-        data.push_back(bound.start);
-        if (!fixed) {
+        auto bound = format_for(value);
+        data.push_back(bound.type_id);
+        if (bound.size > 0) {
             for (auto _: std::ranges::iota_view(bound.size)) {
                 data.push_back(value % 0x100);
                 value /= 0x100;
