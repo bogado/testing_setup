@@ -36,16 +36,21 @@ struct payload {
         
     }
 };
-
+/*
 template <typename ... ARGs>
 auto request(std::string_view name, ARGs... args)
 {
     return vb::packer{}(payload{type::REQUEST, std::string{name}, std::move(args)...});
 }
 
+*/
 }
+
 int main(int argc, const char **argv)
 {
+    std::cout << argv[0];
+    return argc;
+    /*
     using boost::asio::local::stream_protocol;
 
     if (argc < 2) {
@@ -62,11 +67,12 @@ int main(int argc, const char **argv)
         std::cerr << io.error().message() << "\n";
     }
 
-//    auto test_message = message::request("nvim_eval", "\"Hello \" . \"world");
+    auto test_message = message::request("nvim_eval", "\"Hello \" . \"world");
     
     while(true) {
         std::string line;
         std::getline(io, line);
         std::cout << line;
     } 
+    */
 }
