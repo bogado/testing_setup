@@ -1,12 +1,11 @@
 #include <algorithm>
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <iterator>
 #include <optional>
-#include <ranges>
 #include <type_traits>
 #include <utility>
-#include <variant>
 #include <vector>
 
 namespace vb::msgpack {
@@ -116,7 +115,7 @@ constexpr static type type_of(std::uint8_t data) {
 }
 
 static constexpr auto value_of(std::uint8_t data) 
--> std::optional<std::int8_t>{
+-> std::optional<std::int8_t> {
     switch (type_of(data)){
     case type::POSITIVE_FIX_INT:
         return data;
@@ -147,7 +146,55 @@ constexpr auto format_for (const std::integral auto value) {
     }
 }
 
+template <std::floating_point FLOAT_T>
+constexpr auto format_for(const FLOAT_T) {
+    if constexpr (std::same_as<FLOAT_T, float>) {
+        return bounds_of(type::FLOAT_32);
+    } else {
+        return bounds_of(type::FLOAT_64);
+    }
+}
+
+constexpr auto format_for(std::string_view str)
+{
+    auto bnd = bounds_of(type::FIX_STR);
+    if (str.size() <= bnd.size) {
+      bnd.type_id += str.size();
+      bnd.size = str.size();
+    } else {
+      for (auto tp : {type::STR_8, type::STR_16, type::STR_32}) {
+        bnd = bounds_of(tp);
+        if (str.size() < bnd.size) {
+          break;
+        }
+      }
+    }
+    return bnd;
+}
+
+template <typename T>
+auto dump_data(const T& value)
+{
+   return std::bit_cast<std::array<std::uint8_t, sizeof(T)>>(value);
+}
+
 static_assert(format_for(10).type_id == 10);
+
+template <typename PACKER, typename ARG>
+concept is_single_packer_for =
+    std::invocable<PACKER, ARG> &&
+    std::same_as<std::invoke_result_t<PACKER, ARG>, typename PACKER::size_type>;
+
+template <typename PACKER, typename... ARGs>
+concept is_packer_for = 
+    std::invocable<PACKER, ARGs...>
+    && std::same_as<std::invoke_result_t<PACKER, ARGs...>, std::size_t> &&
+    (is_single_packer_for<PACKER, ARGs> && ...)
+    && sizeof...(ARGs) > 0;
+
+template <typename UNPACKER, typename ARG>
+concept is_unpacker_for = std::invocable<UNPACKER>
+    && std::same_as<std::invoke_result_t<UNPACKER>, ARG>;
 
 struct msgpack
 {
@@ -158,19 +205,15 @@ struct msgpack
     bool operator()(const ARG_Ts&...args)
     {
         (*this(args) && ...);
+
         return true;
     }
 
-    bool operator()(std::integral auto value)
+    bool operator()(const auto value)
     {
         auto bound = format_for(value);
         data.push_back(bound.type_id);
-        if (bound.size > 0) {
-            for (auto _: std::ranges::iota_view(bound.size)) {
-                data.push_back(value % 0x100);
-                value /= 0x100;
-            }
-        }
+        std::ranges::copy(dump_data(value), std::back_inserter(data));
     }
 };
 

@@ -40,7 +40,7 @@ struct payload {
 template <typename ... ARGs>
 auto request(std::string_view name, ARGs... args)
 {
-    return msgpack::pack(payload{type::REQUEST, std::string{name}, std::move(args)...});
+    return vb::packer{}(payload{type::REQUEST, std::string{name}, std::move(args)...});
 }
 
 }
