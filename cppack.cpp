@@ -13,6 +13,7 @@ enum class type : unsigned {
     NOTIFICATION = 2
 };
 
+
 template <typename... ARGs>
 struct payload {
     static inline auto last_id = std::uint32_t{0};
