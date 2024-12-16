@@ -83,7 +83,7 @@ int main(int argc, const char** argv)
     }) |  std::ranges::to<std::vector>();
 
     std::ranges::sort(counts, [](auto a, auto b) {
-        return a.second > b.second;
+        return std::get<1>(a) > std::get<1>(b);
     });
 
     for(auto [bit, count] : counts) {

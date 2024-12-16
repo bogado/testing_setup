@@ -1,13 +1,11 @@
 #ifndef INCLUDED_MSGPACK_HPP
 #define INCLUDED_MSGPACK_HPP
 
-#include <algorithm>
 #include <concepts>
 #include <cstddef>
 
 #include <iterator>
 #include <ranges>
-#include <type_traits>
 
 #include "./msgpack/format.hpp"
 #include "./msgpack/types.hpp"

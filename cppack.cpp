@@ -20,7 +20,7 @@ struct payload {
     static inline auto last_id = std::uint32_t{0};
 
     payload(type mtype, const std::string& cmd, ARGs... args)
-        : type{mtype}
+        : my_type{mtype}
         , id{last_id}
         , name{cmd}
         , arguments{std::move(args)...}
@@ -28,7 +28,7 @@ struct payload {
         last_id++;
     }
 
-    type type;
+    type my_type;
     std::uint32_t id;
     std::string name;
     std::tuple<ARGs...> arguments;

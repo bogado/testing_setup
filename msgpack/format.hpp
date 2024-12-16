@@ -103,29 +103,27 @@ struct format_traits
     static constexpr format value = FORMAT;
     static constexpr format_type type = format_type_for(FORMAT);
 private:
+    using values_t = std::tuple<std::uint8_t, std::byte, std::byte, std::int64_t, format>;
+    static constexpr auto nil_like(std::byte value) -> values_t {
+        return values_t{0, std::byte{0}, value, 0, format::UNUSED};
+    };
+
+    static constexpr auto variable(std::uint8_t len, int start, format next) -> values_t {
+        return values_t{0, static_cast<std::byte>(start), static_cast<std::byte>(start+len), 0, next};
+    };
+
+    static constexpr auto byte_count(std::integral auto count, format next) -> values_t {
+        return values_t{ static_cast<uint8_t>(count), std::byte{0}, std::byte{0}, std::size_t{ 1 } << count, next };
+    };
+
+    static constexpr auto fixed(std::integral auto maximum, format next) -> values_t {
+        return { 0, std::byte{0}, std::byte{0}, static_cast<std::size_t>(maximum), next };
+    };
     constexpr static auto values = []()
     {
-        using values_t = std::tuple<std::uint8_t, std::byte, std::byte, std::int64_t, format>;
-
-        static constexpr auto nil_like = [](std::byte value) {
-            return values_t{0, std::byte{0}, value, 0, format::UNUSED};
-        }
-
-        static constexpr auto variable = [](std::uint8_t len, int start, format next) -> values_t {
-            return values_t{0, static_cast<std::byte>(start), static_cast<std::byte>(start+len), 0, next};
-        };
-
-        static constexpr auto byte_count = [](std::integral auto count, format next) -> values_t {
-            return values_t{ static_cast<uint8_t>(count), std::byte{0}, std::byte{0}, std::size_t{ 1 } << count, next };
-        };
-
-        static constexpr auto fixed = [](std::integral auto maximum, format next) -> values_t {
-            return { 0, std::byte{0}, std::byte{0}, static_cast<std::size_t>(maximum), next };
-        };
-
         // NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers)
         return std::array{
-                variable(0x7f, 0, format::INT_8),
+            variable(0x7f, 0, format::INT_8),
                 variable(0x0f, 0x80, format::MAP_16),
                 variable(0x0f, 0x90, format::ARRAY_16),
                 variable(0x1f, 0xa0, format::STR_8),
@@ -180,12 +178,12 @@ public:
 template <format_type TYPE>
 struct format_type_traits {
     using seed_format_traits = format_traits<first_format<TYPE>>;
-    static constexpr auto formats = seed_format_traits::chain();
+    static constexpr auto possible_formats = seed_format_traits::chain();
+    static constexpr auto format_count = possible_formats.size();
 };
 
-static_assert(std::ranges::size(format_type_traits<format_type::ARRAY>::formats) == 3);
-
-static_assert(format_type_traits<format_type::VOID>::size_len == 1);
+static_assert(std::ranges::size(format_type_traits<format_type::ARRAY>::possible_formats) == 3);
+static_assert(format_type_traits<format_type::VOID>::format_count == 1);
 
 }
 #endif // INCLUDED_FORMAT_HPP
