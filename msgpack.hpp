@@ -10,6 +10,7 @@
 #include <type_traits>
 
 #include "./msgpack/format.hpp"
+#include "./msgpack/types.hpp"
 
 namespace vb::msgpack {
 
@@ -19,31 +20,8 @@ concept is_packing_target = std::output_iterator<TARGET, std::byte>;
 template <typename SOURCE>
 concept is_packing_source = std::ranges::range<SOURCE> && std::same_as<std::ranges::range_value_t<SOURCE>, std::byte>;
 
-template <typename CLASS_T>
-concept is_decomposable = requires(const CLASS_T val) {
-    { std::tuple_size_v<CLASS_T> } -> std::unsigned_integral;
-    { std::get<0>(val) };
-};
-
-template <typename MAP>
-concept is_map_like = std::ranges::range<MAP> && requires(const MAP& map) {
-    { *map.begin().first() };
-    { *map.begin().second() };
-};
-
-template<typename ARRAY>
-concept is_array_like =
-  is_decomposable<ARRAY> || (std::ranges::range<ARRAY> && !is_map_like<ARRAY> &&
-                             requires(const ARRAY& array) {
-                                 { *array.begin() };
-                             });
-
-template <typename TYPE>
-concept is_basic_type = std::is_arithmetic_v<TYPE>;
-
 template <typename TYPE>
 concept is_packable = is_decomposable<TYPE> || is_basic_type<TYPE>;
-
 
 //auto as_bytes_view(std::
 
