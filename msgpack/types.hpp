@@ -1,8 +1,6 @@
 #include <string>
 #include <string_view>
 
-#include "./format.hpp"
-
 template <typename TYPE>
 concept is_basic_type = std::is_arithmetic_v<TYPE>;
 
@@ -25,4 +23,8 @@ template<typename ARRAY>
 concept is_array_like =
   is_decomposable<ARRAY> || (std::ranges::range<ARRAY> && !is_map_like<ARRAY> && !is_str_like<ARRAY>);
 
+template<typename PACKABLE>
+concept is_packable =
+  is_array_like<PACKABLE> || is_map_like<PACKABLE> || is_str_like<PACKABLE> ||
+  is_basic_type<PACKABLE> || is_decomposable<PACKABLE>;
 

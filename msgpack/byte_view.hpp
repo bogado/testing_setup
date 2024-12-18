@@ -1,8 +1,9 @@
 #ifndef INCLUDED_BYTE_VIEW_HPP
 #define INCLUDED_BYTE_VIEW_HPP
 
+#include <array>
+#include <bit>
 #include <concepts>
-#include <ranges>
 #include <type_traits>
 
 template <typename T>
