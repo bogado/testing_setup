@@ -1,8 +1,11 @@
+#ifndef INCLUDED_TYPES_HPP
+#define INCLUDED_TYPES_HPP
+
 #include <string>
 #include <string_view>
+#include <type_traits>
 
-template <typename TYPE>
-concept is_basic_type = std::is_arithmetic_v<TYPE>;
+namespace vb::msgpack {
 
 template <typename TYPE>
 concept is_str_like = std::same_as<TYPE, std::string> || std::same_as<TYPE, std::string_view> || std::same_as<TYPE, const char*>;
@@ -26,5 +29,8 @@ concept is_array_like =
 template<typename PACKABLE>
 concept is_packable =
   is_array_like<PACKABLE> || is_map_like<PACKABLE> || is_str_like<PACKABLE> ||
-  is_basic_type<PACKABLE> || is_decomposable<PACKABLE>;
+  std::is_arithmetic_v<PACKABLE> || is_decomposable<PACKABLE>;
 
+}
+
+#endif // INCLUDED_TYPES_HPP

@@ -11,8 +11,10 @@
 #include <format>
 #include <string>
 
-auto print(const is_basic_type auto arg) {
-        auto bytes = byte_view(arg);
+#include "msgpack/byte_view.hpp"
+
+auto print(const vb::is_basic_type auto arg) {
+        auto bytes = vb::byte_view(arg);
         std::ranges::copy(bytes | std::views::transform([](const auto& v) { return std::format("{:#04x}", std::to_underlying(v)); }), std::ostream_iterator<std::string>(std::cout, " "));
         std::cout << "\n";
 }

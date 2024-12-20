@@ -13,101 +13,66 @@
 #include <utility>
 
 #include "./types.hpp"
+#include "./format_type.hpp"
 
 namespace vb::msgpack {
 
-enum class format : std::uint8_t
-{
-    POSITIVE_FIX_INT,
-    FIX_MAP,
-    FIX_ARRAY,
-    FIX_STR,
-    NIL,
-    UNUSED,
-    BOOLEAN,
-    BIN_8,
-    BIN_16,
-    BIN_32,
-    EXT_8,
-    EXT_16,
-    EXT_32,
-    FLOAT_32,
-    FLOAT_64,
-    UINT_8,
-    UINT_16,
-    UINT_32,
-    UINT_64,
-    INT_8,
-    INT_16,
-    INT_32,
-    INT_64,
-    FIXEXT_1,
-    FIXEXT_2,
-    FIXEXT_4,
-    FIXEXT_8,
-    FIXEXT_16,
-    STR_8,
-    STR_16,
-    STR_32,
-    ARRAY_16,
-    ARRAY_32,
-    MAP_16,
-    MAP_32,
-    NEGATIVE_FIX_INT
+struct format {
+    using enum format_type::type_t;
+    using enum format_type::category_t;
+
+    static constexpr auto POSITIVE_FIX_INT = format_type{ INTEGER, DIRECT,            std::byte{0}, 0x7f};
+    static constexpr auto FIX_MAP = format_type{          MAP,     CONTAINER | FIXED, std::byte{0x80}, 0xf};
+    static constexpr auto FIX_ARRAY = format_type{        ARRAY,   CONTAINER | FIXED, std::byte{0x90}, 0xf};
+    static constexpr auto FIX_STR = format_type{          STR,     CONTAINER | FIXED, std::byte{0xa0}, 0x1f};
+    static constexpr auto NIL = format_type{              VOID,    DIRECT,            std::byte{0xc0}, 1};
+    static constexpr auto UNUSED = format_type{           VOID,    UNKNOWN,           std::byte{0xc1}, 1};
+    static constexpr auto TRUE = format_type{             BOOL,    DIRECT,            std::byte{0xc2}, 1};
+    static constexpr auto FALSE = format_type{            BOOL,    DIRECT,            std::byte{0xc3}, 1};
+    static constexpr auto BIN_8 = format_type{            BIN,     CONTAINER,         std::byte{0xc4}, 1};
+    static constexpr auto BIN_16 = format_type{           BIN,     CONTAINER,         std::byte{0xc5}, 1};
+    static constexpr auto BIN_32 = format_type{           BIN,     CONTAINER,         std::byte{0xc6}, 1};
+    static constexpr auto EXT_8 = format_type{            EXT,     CONTAINER,         std::byte{0xc7}, 1};
+    static constexpr auto EXT_16 = format_type{           EXT,     CONTAINER,         std::byte{0xc8}, 1};
+    static constexpr auto EXT_32 = format_type{           EXT,     CONTAINER,         std::byte{0xc9}, 1};
+    static constexpr auto FLOAT_32 = format_type{         EXT,     CONTAINER,         std::byte{0xca}, 1};
+    static constexpr auto FLOAT_64 = format_type{         EXT,     CONTAINER,         std::byte{0xcb}, 1};
+    static constexpr auto UINT_8 = format_type{           INTEGER, FIXED,             std::byte{0xcc}, 1};
+    static constexpr auto UINT_16 = format_type{          INTEGER, FIXED,             std::byte{0xcd}, 1};
+    static constexpr auto UINT_32 = format_type{          INTEGER, FIXED,             std::byte{0xce}, 1};
+    static constexpr auto UINT_64 = format_type{          INTEGER, FIXED,             std::byte{0xcf}, 1};
+    static constexpr auto INT_8 = format_type{            INTEGER, SIGNED | FIXED,    std::byte{0xd0}, 1};
+    static constexpr auto INT_16 = format_type{           INTEGER, SIGNED | FIXED,    std::byte{0xd1}, 1};
+    static constexpr auto INT_32 = format_type{           INTEGER, SIGNED | FIXED,    std::byte{0xd2}, 1};
+    static constexpr auto INT_64 = format_type{           INTEGER, SIGNED | FIXED,    std::byte{0xd3}, 1};
+    static constexpr auto FIXEXT_1 = format_type{         EXT,     FIXED,             std::byte{0xd4}, 1};
+    static constexpr auto FIXEXT_2 = format_type{         EXT,     FIXED,             std::byte{0xd5}, 1};
+    static constexpr auto FIXEXT_4 = format_type{         EXT,     FIXED,             std::byte{0xd6}, 1};
+    static constexpr auto FIXEXT_8 = format_type{         EXT,     FIXED,             std::byte{0xd7}, 1};
+    static constexpr auto FIXEXT_16 = format_type{        EXT,     FIXED,             std::byte{0xd8}, 1};
+    static constexpr auto STR_8 = format_type{            STR,     FIXED,             std::byte{0xd9}, 1};
+    static constexpr auto STR_16 = format_type{           STR,     FIXED,             std::byte{0xda}, 1};
+    static constexpr auto STR_32 = format_type{           STR,     FIXED,             std::byte{0xdb}, 1};
+    static constexpr auto ARRAY_16 = format_type{         ARRAY,   FIXED,             std::byte{0xdc}, 1};
+    static constexpr auto ARRAY_32 = format_type{         ARRAY,   FIXED,             std::byte{0xdd}, 1};
+    static constexpr auto MAP_16 = format_type{           MAP,     FIXED,             std::byte{0xde}, 1};
+    static constexpr auto MAP_32 = format_type{           MAP,     FIXED,             std::byte{0xdf}, 1};
+    static constexpr auto NEGATIVE_FIX_INT = format_type{ INTEGER, DIRECT | SIGNED,   std::byte{0xe0}, -0x1f};
+
+    format_type details;
+
+    bool operator==(const format_type& other) const
+    {
+        return details == other; 
+    }
 };
-
-enum class format_type : std::uint8_t
-{
-    INTEGER = std::to_underlying(format::NEGATIVE_FIX_INT),
-    BOOL = std::to_underlying(format::BOOLEAN),
-    FLOAT = std::to_underlying(format::FLOAT_32),
-    STR = std::to_underlying(format::FIX_STR),
-    ARRAY = std::to_underlying(format::FIX_ARRAY),
-    MAP = std::to_underlying(format::FIX_MAP),
-    EXT = std::to_underlying(format::FIXEXT_1),
-    VOID = std::to_underlying(format::NIL),
-    BIN = std::to_underlying(format::BIN_8),
-    UNKNOWN = std::to_underlying(format::UNUSED)
-};
-
-template <format_type FORMAT_TYPE>
-constexpr auto first_format = format{std::to_underlying(FORMAT_TYPE)};
-
-constexpr auto format_type_for(format fmt) 
-{
-    using enum format;
-    using enum format_type;
-
-    if (fmt == POSITIVE_FIX_INT || fmt == NEGATIVE_FIX_INT || (fmt >= UINT_8 && fmt <= INT_64)) {
-        return INTEGER;
-    } else if (fmt == BOOLEAN) {
-        return BOOL;
-    } else if (fmt == FLOAT_32 || fmt == FLOAT_64) {
-        return FLOAT;
-    } else if (fmt == FIX_STR || (fmt >= STR_8 && fmt <= STR_16)) {
-        return STR;
-    } else if (fmt == FIX_ARRAY || fmt == ARRAY_16 || fmt == ARRAY_32) {
-        return ARRAY;
-    } else if (fmt == FIX_MAP || fmt == MAP_16 || fmt == MAP_32) {
-        return MAP;
-    } else if (
-     (fmt >= FIXEXT_1 && fmt <= FIXEXT_16) || (fmt >= EXT_8 && fmt <= EXT_32)) {
-        return EXT;
-    } else if (fmt == NIL) {
-        return VOID;
-    } else if (fmt >= BIN_8 && fmt <= BIN_32) {
-        return BIN;
-    } 
-    return UNKNOWN;
-}
 
 template <format FORMAT>
 struct format_traits
 {
     static constexpr format value = FORMAT;
-    static constexpr format_type type = format_type_for(FORMAT);
+
 private:
-    using values_t = std::tuple<std::uint8_t, std::byte, std::byte, std::int8_t, format>;
     static constexpr auto nil_like(std::byte value) -> values_t {
         return values_t{0, std::byte{0}, value, 0, format::UNUSED};
     };
