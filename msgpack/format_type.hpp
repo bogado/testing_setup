@@ -3,16 +3,13 @@
 
 #include "./types.hpp"
 
+#include <any>
 #include <cstdint>
+#include <map>
 #include <type_traits>
 #include <utility>
-#include <concepts>
 
 namespace vb::msgpack {
-
-
-struct format_type {
-
 enum class type_t : std::uint8_t
 {
     INTEGER,
@@ -23,74 +20,212 @@ enum class type_t : std::uint8_t
     MAP,
     EXT,
     VOID,
-    BIN
+    BIN,
+    NO_TYPE
 };
-using enum type_t;
 
-enum class category_t: std::uint8_t
+enum class category_t : std::uint8_t
 {
-    UNKNOWN      = 0b100'0000,
-    SIGNED       = 0b010'0000,
-    NUMERIC      = 0b001'0000,
-    VALUE        = 0b000'1000,
-    CONTAINER    = 0b000'0100,
-    FIXED        = 0b000'0010,
-    DIRECT       = 0b000'0001,
-    NO_CATEGORY  = 0b000'0000
-};
-using enum category_t;
-
-type_t type;
-category_t category;
-std::byte min_id;
-std::int8_t id_range;
-
-constexpr bool operator==(const format_type&) const = default;
-constexpr bool operator==(const type_t& other) const {
-    return type == other;
-}
-
-
-constexpr bool has_length() const;
+    UNKNOWN     = 0b100'0000,
+    SIZED       = 0b010'0000,
+    SIGNED      = 0b001'0000,
+    NUMERIC     = 0b000'1000,
+    VALUE       = 0b000'0100,
+    CONTAINER   = 0b000'0010,
+    FIXED       = 0b000'0001,
+    NO_CATEGORY = 0b000'0000
 };
 
-constexpr format_type::category_t operator &(const format_type::category_t a, const format_type::category_t b) {
-    return format_type::category_t{std::to_underlying(a) and std::to_underlying(b)};    
+constexpr category_t operator&(
+ const category_t a,
+ const category_t b)
+{
+    return category_t{ static_cast<uint8_t>(std::to_underlying(a) bitand
+        std::to_underlying(b)) };
 }
 
-constexpr format_type::category_t operator |(const format_type::category_t a, const format_type::category_t b) {
-    return format_type::category_t{std::to_underlying(a) or std::to_underlying(b)};    
+constexpr category_t operator|(
+ const category_t a,
+ const category_t b)
+{
+    return category_t{ static_cast<uint8_t>(std::to_underlying(a) bitor
+        std::to_underlying(b)) };
 }
 
-constexpr bool operator==(const format_type& format, const format_type::category_t& other) {
-    return (format.category | other) != format_type::category_t::NO_CATEGORY;
+constexpr bool is_valid(category_t category)
+{
+    return category != category_t::NO_CATEGORY;
 }
 
-constexpr bool format_type::has_length() const{
-    return (category & (FIXED | DIRECT)) != NO_CATEGORY;
+constexpr bool is_valid(type_t type)
+{
+    return type != type_t::NO_TYPE;
 }
 
-template<typename TYPE, format_type FMT_TYPE>
-concept is =
-  ((FMT_TYPE == format_type::STR && is_str_like<TYPE>) ||
-   (FMT_TYPE == format_type::MAP && is_map_like<TYPE>) ||
-   (FMT_TYPE == format_type::CONTAINER && std::ranges::sized_range<TYPE>) ||
-   (FMT_TYPE == format_type::ARRAY && is_array_like<TYPE>) ||
-   (FMT_TYPE == format_type::NUMERIC && std::is_arithmetic_v<TYPE>) ||
-   (FMT_TYPE == format_type::FLOAT && std::is_floating_point_v<TYPE>) ||
-   (FMT_TYPE == format_type::INTEGER && std::integral<TYPE>) ||
-   (FMT_TYPE == format_type::SIGNED && std::is_signed_v<TYPE>) ||
-   (FMT_TYPE == format_type::BOOL && std::same_as<TYPE, bool>));
+namespace format {
 
-template <format_type FMT_TYPE, is<FMT_TYPE> TYPE>
-std::uintmax_t measure(const TYPE& object) {
-        if constexpr (FMT_TYPE == format_type::CONTAINER) {
-            return object.size();
+struct id {
+    std::byte ident;
+
+    constexpr id(std::uint8_t v)
+      : ident{ v }
+    {}
+
+    struct reach_t {
+        std::uint8_t length;
+    };
+
+    constexpr id operator ++(int) 
+    {
+        auto other = *this;
+        return other;
+    }
+
+    constexpr id &operator ++() 
+    {
+        ident = static_cast<std::byte>(std::to_underlying(ident)+1);
+        return *this;
+    }
+
+    constexpr std::uint8_t value() const
+    {
+        return static_cast<uint8_t>(ident);
+    }
+
+    template<typename VALUE_T>
+    requires (sizeof(VALUE_T) == 1) 
+    struct directValue {
+        using value_type = VALUE_T;
+        value_type value;
+    };
+
+    template<typename VALUE_T>
+    requires (sizeof(VALUE_T) == 1) 
+    constexpr id(id predecessor, directValue<VALUE_T> val, VALUE_T value) :
+        ident{predecessor.value() + value -
+            val.value()}
+    {}
+
+    constexpr bool operator==(const id&) const = default;
+    constexpr bool operator!=(const id&) const = default;
+};
+
+template <type_t TYPE, category_t CATEGORY, std::uint8_t ID, std::int8_t SPEC>
+struct traits
+{
+    using enum category_t;
+    using enum type_t;
+
+    static constexpr category_t category = CATEGORY;
+    static constexpr type_t type = TYPE;
+    static constexpr id format = id{ID};
+
+    constexpr static bool is(type_t type_b)
+    {
+        return type_b == type;
+    }
+
+    constexpr static bool is(category_t FMT_TYPE)
+    {
+        return is_valid(FMT_TYPE & category);
+    }
+
+    static constexpr bool accept(id other) 
+    {
+        if constexpr (is(VALUE)) {
+            auto [min, max] = value_range;
+            return other.value() >= min && other.value() <= max;
         } else {
-            return sizeof(object);
+           return other == format;
         }
     }
-}
 
-#endif // INCLUDED_FORMAT_TYPE_HPP
+    using standard_type =
+        std::conditional_t<
+            is(INTEGER) && !is(VALUE), integer<SPEC, is(SIGNED)>,
+        std::conditional_t<
+            is(INTEGER) && is(VALUE), integer<8, is(SIGNED)>,
+        std::conditional_t<
+            is(BOOL), bool,
+        std::conditional_t<
+            is(FLOAT), floating<SPEC>,
+        std::conditional_t<
+            is(STR), std::string,
+        std::conditional_t<
+            is(ARRAY), std::vector<std::any>,
+        std::conditional_t<
+            is(MAP), std::map<std::any, std::any>,
+        std::conditional_t< 
+            is(EXT), ext<SPEC>,
+        std::conditional_t<
+            is(BIN), std::vector<std::byte>,
+        std::conditional<
+            is<VOID>, nullptr_t,
+        std::false_type >>>>>>>>>>;
 
+    static constexpr auto value = []() {
+        if constexpr (is(VALUE)) {
+            if constexpr(is(BOOL)) {
+                return SPEC == 1;
+            } else if constexpr(is(VOID)) {
+                return nullptr;
+            } else {
+                return static_cast<standard_type>(format.value());
+            }
+        } else {
+            return std::false_type{};
+        };
+    }();
+
+    static constexpr auto value_range = []() {
+        if constexpr (is(VALUE)) {
+            if constexpr(is(BOOL) || is(VOID)) {
+                return std::pair{value, value};
+            } else {
+                auto first = value;
+                auto second = first + static_cast<standard_type>(SPEC);
+                if (first < second) {
+                    std::swap(first, second);
+                }
+                return std::pair{first, second};
+            }
+        } else {
+            return std::false_type{};
+        };
+    }();
+
+    static constexpr bool belongs(id val) {
+        auto range = value_range();
+        if constexpr (std::same_as<decltype(range), std::false_type>) {
+            return false;
+        }
+        return val.value() >= range.first && val.value() <= range.second;
+    }
+
+    static constexpr auto count_bytes = []() {
+        if constexpr (is(CONTAINER)) {
+            return SPEC / 8;
+        } else if constexpr (is(SIZED)) {
+            return SPEC;
+        } else if constexpr (is(VALUE) || is(FIXED)) {
+            return 0;
+        } else {
+            return std::false_type{};
+        }
+    }();
+
+    static constexpr auto content_size = []() {
+        if constexpr (is(FIXED)) {
+            if constexpr (is(NUMERIC)) {
+                return SPEC/8;
+            } else {
+                return SPEC;
+            }
+        } else {
+            return std::false_type{};
+        }
+    }();
+};
+
+}}
+#endif // 

@@ -8,18 +8,19 @@
 namespace message
 {
 
+
 enum class type : unsigned {
     REQUEST = 0,
     RESPONSE = 1,
     NOTIFICATION = 2
 };
-
+}
 
 template <typename... ARGs>
 struct payload {
     static inline auto last_id = std::uint32_t{0};
 
-    payload(type mtype, const std::string& cmd, ARGs... args)
+    payload(message::type mtype, const std::string& cmd, ARGs... args)
         : my_type{mtype}
         , id{last_id}
         , name{cmd}

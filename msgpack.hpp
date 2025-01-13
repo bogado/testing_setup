@@ -9,6 +9,7 @@
 
 #include "./msgpack/format.hpp"
 #include "./msgpack/types.hpp"
+#include "./msgpack/byte_view.hpp"
 
 namespace vb::msgpack {
 
@@ -18,21 +19,14 @@ concept is_packing_target = std::output_iterator<TARGET, std::byte>;
 template <typename SOURCE>
 concept is_packing_source = std::ranges::range<SOURCE> && std::same_as<std::ranges::range_value_t<SOURCE>, std::byte>;
 
-template <typename TYPE>
-concept is_packable = is_decomposable<TYPE> || is_basic_type<TYPE>;
-
 //auto as_bytes_view(std::
 
 template<is_packable TYPE_T, is_packing_target TARGET_T>
 void pack(const TYPE_T& obj, TARGET_T& out)
 {
-    using pack_type_traits = format_type_traits<format_type_for(obj)>;
+    auto formater= format(obj);
 
-    auto size = pack_type_traits::measure(obj);
-
-    const auto frmt = format_class{obj};
-    *out = frmt.id();
-    out++;
+    *out++ = formater.id();
 
     std::ranges::copy(frmt.count_repr(), out);
     if constexpr (packs_as_array<TYPE_T>) {
