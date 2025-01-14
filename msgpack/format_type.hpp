@@ -8,6 +8,7 @@
 #include <map>
 #include <type_traits>
 #include <utility>
+#include <vector>
 
 namespace vb::msgpack {
 enum class type_t : std::uint8_t
@@ -67,6 +68,10 @@ namespace format {
 struct id {
     std::byte ident;
 
+    constexpr id(std::byte v)
+        : ident{v}
+    {}
+
     constexpr id(std::uint8_t v)
       : ident{ v }
     {}
@@ -75,16 +80,26 @@ struct id {
         std::uint8_t length;
     };
 
-    constexpr id operator ++(int) 
+    constexpr const id operator ++(int)
     {
         auto other = *this;
+        ++(*this);
         return other;
     }
 
-    constexpr id &operator ++() 
+    constexpr id &operator ++()
     {
         ident = static_cast<std::byte>(std::to_underlying(ident)+1);
         return *this;
+    }
+
+    constexpr id operator++() const {
+        auto other = *this;
+        return ++other;
+    }
+
+    constexpr id middle(id other) const {
+        return id{static_cast<std::byte>(value() + other.value()/2)};
     }
 
     constexpr std::uint8_t value() const
@@ -130,9 +145,9 @@ struct traits
         return is_valid(FMT_TYPE & category);
     }
 
-    static constexpr bool accept(id other) 
+    static constexpr bool accepts(id other) 
     {
-        if constexpr (is(VALUE)) {
+        if constexpr (is(VALUE) && is(NUMERIC)) {
             auto [min, max] = value_range;
             return other.value() >= min && other.value() <= max;
         } else {
@@ -148,7 +163,7 @@ struct traits
         std::conditional_t<
             is(BOOL), bool,
         std::conditional_t<
-            is(FLOAT), floating<SPEC>,
+            is(FLOAT), floating<bit_size<SPEC>>,
         std::conditional_t<
             is(STR), std::string,
         std::conditional_t<
@@ -156,11 +171,11 @@ struct traits
         std::conditional_t<
             is(MAP), std::map<std::any, std::any>,
         std::conditional_t< 
-            is(EXT), ext<SPEC>,
+            is(EXT), ext<bit_size<SPEC>>,
         std::conditional_t<
             is(BIN), std::vector<std::byte>,
         std::conditional<
-            is<VOID>, nullptr_t,
+            is(VOID), std::nullptr_t,
         std::false_type >>>>>>>>>>;
 
     static constexpr auto value = []() {
@@ -182,12 +197,13 @@ struct traits
             if constexpr(is(BOOL) || is(VOID)) {
                 return std::pair{value, value};
             } else {
-                auto first = value;
-                auto second = first + static_cast<standard_type>(SPEC);
+                auto first = standard_type{value};
+                auto second = static_cast<standard_type>(first + standard_type{SPEC});
                 if (first < second) {
-                    std::swap(first, second);
+                    return std::pair{first, second};
+                } else {
+                    return std::pair{second, first};
                 }
-                return std::pair{first, second};
             }
         } else {
             return std::false_type{};

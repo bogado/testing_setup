@@ -20,7 +20,7 @@ template <typename SOURCE>
 concept is_packing_source = std::ranges::range<SOURCE> && std::same_as<std::ranges::range_value_t<SOURCE>, std::byte>;
 
 //auto as_bytes_view(std::
-
+/*
 template<is_packable TYPE_T, is_packing_target TARGET_T>
 void pack(const TYPE_T& obj, TARGET_T& out)
 {

@@ -3,6 +3,7 @@
 
 #include <bit>
 #include <concepts>
+#include <cstdint>
 #include <ranges>
 #include <string>
 #include <string_view>
@@ -13,14 +14,14 @@ namespace vb::msgpack {
 
 struct numeric
 {
-    using value_type = std::variant<int8_t,
-                                    uint8_t,
-                                    int16_t,
-                                    uint16_t,
-                                    int32_t,
-                                    uint32_t,
-                                    int64_t,
-                                    uint64_t,
+    using value_type = std::variant<std::int8_t,
+                                    std::uint8_t,
+                                    std::int16_t,
+                                    std::uint16_t,
+                                    std::int32_t,
+                                    std::uint32_t,
+                                    std::int64_t,
+                                    std::uint64_t,
                                     float,
                                     double>;
     value_type value;
@@ -56,8 +57,17 @@ struct numeric
     }
 };
 
-template<unsigned LEN, bool IS_SIGNED = false>
-using integer = std::variant_alternative_t<std::bit_width(LEN/16)*2+(IS_SIGNED?0:1), numeric::value_type>;
+template <int LEN>
+constexpr unsigned bit_size = (LEN == 8 || LEN == 16 || LEN == 32 || LEN == 64)?LEN:8;
+
+template<int LEN, bool IS_SIGNED = false>
+using integer = std::conditional_t<
+  LEN == bit_size<LEN>,
+  std::variant_alternative_t<
+    std::bit_width(bit_size<LEN> / 16) * 2 + (IS_SIGNED ? 0 : 1),
+    numeric::value_type>,
+  std::conditional_t<IS_SIGNED, int, unsigned>>;
+
 static_assert(std::same_as<integer<64>, std::uint64_t>);
 static_assert(std::same_as<integer<32, true>, std::int32_t>);
 
