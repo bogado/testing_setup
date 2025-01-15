@@ -1,15 +1,10 @@
 #ifndef INCLUDED_MSGPACK_HPP
 #define INCLUDED_MSGPACK_HPP
 
-#include <concepts>
 #include <cstddef>
 
-#include <iterator>
-#include <ranges>
 
 #include "./msgpack/format.hpp"
-#include "./msgpack/types.hpp"
-#include "./msgpack/byte_view.hpp"
 
 namespace vb::msgpack {
 
@@ -19,31 +14,19 @@ concept is_packing_target = std::output_iterator<TARGET, std::byte>;
 template <typename SOURCE>
 concept is_packing_source = std::ranges::range<SOURCE> && std::same_as<std::ranges::range_value_t<SOURCE>, std::byte>;
 
-//auto as_bytes_view(std::
-/*
-template<is_packable TYPE_T, is_packing_target TARGET_T>
-void pack(const TYPE_T& obj, TARGET_T& out)
+template <is_packable TYPE>
+constexpr auto unpack(is_packing_source auto source)
 {
-    auto formater= format(obj);
+    auto traits = format::classification{source.first};
+    if (!traits.accepts<TYPE>()) {
+        return std::pair{std::ranges::all_of(source), std::optional<TYPE>{}};
+    } else if (traits.is_value()) {
+        return std::pair{std::ranges::subrange(source, 1), traits.value()};
+    } else if (traits.count_length() > 0) {
+        
 
-    *out++ = formater.id();
-
-    std::ranges::copy(frmt.count_repr(), out);
-    if constexpr (packs_as_array<TYPE_T>) {
-        for (const auto& item : obj) {
-            pack(item, out);
-        }
-    } else if constexpr (packs_as_map<TYPE_T>) {
-        for (const auto& [key, value] : obj) {
-            pack(key, out);
-            pack(value, out);
-        }
-    } else if constexpr (std::is_integral_v<TYPE_T>) {
-        if (frmt.is_fixed()) {
-            return;
-        }
     }
-} */
+}
 
 }
 #endif // INCLUDED_MSGPACK_HPP

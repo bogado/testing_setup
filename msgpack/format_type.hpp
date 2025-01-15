@@ -1,14 +1,9 @@
 #ifndef INCLUDED_FORMAT_TYPE_HPP
 #define INCLUDED_FORMAT_TYPE_HPP
 
-#include "./types.hpp"
-
-#include <any>
 #include <cstdint>
-#include <map>
-#include <type_traits>
-#include <utility>
-#include <vector>
+
+#include "./types.hpp"
 
 namespace vb::msgpack {
 enum class type_t : std::uint8_t
@@ -177,6 +172,14 @@ struct traits
         std::conditional<
             is(VOID), std::nullptr_t,
         std::false_type >>>>>>>>>>;
+
+    template<is_packable T>
+    static constexpr bool accepts_type =
+      (is(INTEGER) && std::is_integral_v<T>) ||
+      (is(FLOAT) && std::is_floating_point_v<T>) ||
+      (is(BOOL) && std::same_as<T, bool>) || (is(ARRAY) && is_array_like<T>) ||
+      (is(MAP) && is_map_like<T>) || (is(EXT) && is_ext_like<T>) ||
+      (is(BIN) && is_buffer_like<T>) || (is(VOID) && std::is_null_pointer_v<T>);
 
     static constexpr auto value = []() {
         if constexpr (is(VALUE)) {

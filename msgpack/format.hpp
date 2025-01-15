@@ -1,18 +1,14 @@
 #ifndef INCLUDED_FORMAT_HPP
 #define INCLUDED_FORMAT_HPP
 
-#include <algorithm>
 #include <cstddef>
-#include <functional>
-#include <limits>
-#include <utility>
 #include <variant>
 
 #include "./format_type.hpp"
 
-namespace vb::msgpack {
+namespace vb::msgpack::format {
 
-struct formater
+struct classification
 {
     using enum type_t;
     using enum category_t;
@@ -58,7 +54,8 @@ struct formater
       format::traits<INTEGER, SIGNED | VALUE, 0xe0, -0x1f>;
 
     // NOLINTEND(cppcoreguidelines-avoid-magic-numbers)
-    using traits_type = std::variant<POSITIVE_FIX_INT,
+    using traits_type = std::variant<std::monostate,
+                                     POSITIVE_FIX_INT,
                                      FIX_MAP,
                                      FIX_ARRAY,
                                      FIX_STR,
@@ -90,31 +87,79 @@ struct formater
                                      MAP_32,
                                      NEGATIVE_FIX_INT>;
 
-    template<format::id MIN_ID = format::id{ 0 }, format::id MAX_ID = format::id{std::numeric_limits<std::byte>::max()}, std::size_t... INDEX>
-    std::size_t index_of(std::byte index, std::index_sequence<INDEX...> = std::make_index_sequence<std::variant_size_v<traits_type>>{})
-    {
-        std::uint8_t idx = static_cast<std::uint8_t>(index);
-        static constexpr auto middle = MIN_ID.middle(MAX_ID);
-        if (middle.value() != idx) {
-            if (idx > middle.value()) {
-                return index_of<middle, MAX_ID>(std::byte{idx});
-            } else {
-                return index_of<MIN_ID, middle>(std::byte{idx});
-            };
-        }
+    static constexpr auto formats_count = std::variant_size_v<traits_type>;
 
-        return ((trait_num<INDEX>::accepts(MIN_ID) ? INDEX : 0) + ... + 0);
+    template<std::integral auto I>
+    requires(I >= 0 && I < formats_count)
+    using trait_num = std::variant_alternative_t<I, traits_type>;
+
+    template <unsigned INDICE = formats_count-1>
+    constexpr traits_type traits_for(std::byte index)
+    {
+        if constexpr (std::same_as<trait_num<INDICE>, std::monostate>) {
+            return std::monostate{};
+        } else {
+            if (trait_num<INDICE>::accepts(format::id{index})) {
+                return trait_num<INDICE>{};
+            }
+            return traits_for<INDICE-1>(index);
+        }
     }
 
     traits_type traits;
 
-    template<std::integral auto I>
-    using trait_num = std::variant_alternative_t<I, traits_type>;
+    constexpr classification(std::byte val)
+      : traits{ traits_for(val) }
+    {}
 
-    constexpr formater(std::byte val)
-      : traits{ trait_num<index_of(val)>{} }
-    {
+    template <typename INVOCABLE_T, typename RESULT_T>
+    constexpr auto visitor(INVOCABLE_T invocable, RESULT_T default_value) {
+        return std::visit([invocable, default_value]<typename ARGUMENT_T>(ARGUMENT_T value) -> RESULT_T {
+            if constexpr (std::same_as<std::monostate, ARGUMENT_T>) {
+                throw std::logic_error("Invalid access");
+            } else if constexpr (std::same_as<std::invoke_result_t<INVOCABLE_T, ARGUMENT_T>, std::false_type>) {
+                return default_value;
+            } else {
+                return invocable(value);
+            }
+        }, traits);
+    }
+
+    constexpr auto content_size() {
+        return visitor([]<typename TRAITS_T>(TRAITS_T) -> int {
+                return TRAITS_T::content_size;
+        }, 0);
+    }
+
+    constexpr auto count_length() {
+        return visitor([]<typename TRAITS_T>(TRAITS_T) -> std::size_t {
+                return TRAITS_T::count_bytes;
+        }, 0);
+    }
+
+    constexpr auto is_value() {
+        return visitor([]<typename TRAITS_T>(TRAITS_T) -> bool {
+            return TRAITS_T::is(VALUE);
+        }, false);
+    }
+
+    constexpr auto value() {
+        return visitor([]<typename TRAITS_T>(TRAITS_T) -> std::optional<std::int8_t> {
+            if constexpr (TRAITS_T::is(VOID)) {
+                return {};
+            } else {
+               return TRAITS_T::value;
+            }
+        }, std::optional<int8_t>{});
+    }
+
+    template <is_packable TYPE>
+    constexpr bool accepts() {
+        return visitor([]<typename TRAITS_T>(TRAITS_T) -> bool {
+            return TRAITS_T::template accepts_type<TYPE>;
+        }, false);
     }
 };
+
 }
 #endif // INCLUDED_FORMAT_HPP

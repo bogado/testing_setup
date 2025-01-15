@@ -20,7 +20,7 @@ template <typename... ARGs>
 struct payload {
     static inline auto last_id = std::uint32_t{0};
 
-    payload(message::type mtype, const std::string& cmd, ARGs... args)
+    constexpr payload(message::type mtype, const std::string& cmd, ARGs... args)
         : my_type{mtype}
         , id{last_id}
         , name{cmd}
@@ -29,12 +29,12 @@ struct payload {
         last_id++;
     }
 
-    type my_type;
+    message::type my_type;
     std::uint32_t id;
     std::string name;
     std::tuple<ARGs...> arguments;
 
-    void pack(this auto&& self, auto &pack) {
+    constexpr void pack(this auto&& self, auto &pack) {
         pack(static_cast<int>(self.type), self.id, self.name);
         
     }
@@ -47,7 +47,6 @@ auto request(std::string_view name, ARGs... args)
 }
 
 */
-}
 
 int main(int argc, const char **argv)
 {
