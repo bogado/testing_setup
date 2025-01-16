@@ -1,10 +1,12 @@
 #ifndef INCLUDED_TYPES_HPP
 #define INCLUDED_TYPES_HPP
 
+#include <bit>
 #include <compare>
 #include <concepts>
 #include <cstdint>
 #include <optional>
+#include <string_view>
 #include <type_traits>
 #include <variant>
 

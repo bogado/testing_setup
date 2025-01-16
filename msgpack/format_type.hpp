@@ -1,9 +1,12 @@
 #ifndef INCLUDED_FORMAT_TYPE_HPP
 #define INCLUDED_FORMAT_TYPE_HPP
 
-#include <cstdint>
-
 #include "./types.hpp"
+
+#include <any>
+#include <cstdint>
+#include <map>
+#include <utility>
 
 namespace vb::msgpack {
 enum class type_t : std::uint8_t

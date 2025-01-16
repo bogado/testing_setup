@@ -1,10 +1,10 @@
 #ifndef INCLUDED_FORMAT_HPP
 #define INCLUDED_FORMAT_HPP
 
+#include "./format_type.hpp"
+
 #include <cstddef>
 #include <variant>
-
-#include "./format_type.hpp"
 
 namespace vb::msgpack::format {
 

@@ -1,10 +1,10 @@
 #ifndef INCLUDED_MSGPACK_HPP
 #define INCLUDED_MSGPACK_HPP
 
-#include <cstddef>
-
-
 #include "./msgpack/format.hpp"
+
+#include <algorithm>
+#include <cstddef>
 
 namespace vb::msgpack {
 
