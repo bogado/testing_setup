@@ -132,15 +132,16 @@ struct numeric_union
 
     numeric_union operator- () const {
         return std::visit(
-         [&]<typename T>(const T& val) {
-             if constexpr (std::is_floating_point_v<T>) {
-                 return numeric_union{static_cast<T>(-val)};
-             } else if constexpr (std::is_signed_v<T>) {
-                 return numeric_union{static_cast<T>(-val)};
-             } else {
-                 return numeric_union{-val};
-            }
-         }, value);
+          [&]<typename T>(const T& val) {
+              if constexpr (std::is_floating_point_v<T> ||
+                            std::is_signed_v<T>)
+              {
+                  return numeric_union{ static_cast<T>(-val) };
+              } else {
+                  return numeric_union{ -val };
+              }
+          },
+          value);
     }
 
     value_type value;
