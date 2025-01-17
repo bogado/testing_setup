@@ -1,11 +1,13 @@
 #ifndef INCLUDED_TYPES_HPP
 #define INCLUDED_TYPES_HPP
 
+#include <sys/types.h>
 #include <bit>
 #include <array>
 #include <compare>
 #include <concepts>
 #include <cstdint>
+#include <limits>
 #include <optional>
 #include <ranges>
 #include <string_view>
@@ -15,16 +17,13 @@
 
 namespace vb::msgpack {
 
-template <typename NUMERICAL>
+template<typename NUMERICAL>
 concept is_numeric = requires(const NUMERICAL val) {
     { val + val } -> std::convertible_to<NUMERICAL>;
-    { val * val } -> std::convertible_to<NUMERICAL>;
-    { 1   * val } -> std::convertible_to<NUMERICAL>;
+    { val *val } -> std::convertible_to<NUMERICAL>;
+    { 1 * val } -> std::convertible_to<NUMERICAL>;
     { 1.0 * val } -> std::convertible_to<NUMERICAL>;
-    std::three_way_comparable_with<NUMERICAL, NUMERICAL>;
-    std::convertible_to<NUMERICAL, std::int64_t> || std::convertible_to<NUMERICAL, std::uint64_t>;
-    std::convertible_to<NUMERICAL, double>;
-};
+} && std::three_way_comparable_with<NUMERICAL, NUMERICAL>;
 
 template <typename... TYPEs>
 constexpr auto variant_sizeof(std::variant<TYPEs...> var) 
@@ -37,6 +36,7 @@ struct numeric_union
 {
     using value_type = std::variant<NUMERICs...>;
 
+
     static constexpr auto type_count = sizeof...(NUMERICs);
 
     static constexpr auto prototypes = []<std::size_t ... I>(std::index_sequence<I...>) {
@@ -45,35 +45,49 @@ struct numeric_union
 
     static constexpr auto sizes = []() {
         return prototypes | std::views::transform([](const auto& prototype) {
-                   return variant_sizeof(prototype);
-               });
+            return variant_sizeof(prototype);
+        });
     }();
 
     template <std::integral auto I>
-    requires(I >= 0 && I < type_count)
-    using int_type = std::variant_alternative_t<I, value_type>;
+        requires(I >= 0 && I < type_count)
+        using int_type = std::variant_alternative_t<I, value_type>;
 
-    auto as_int() const
-    {
-        return std::optional{std::visit(
-          []<std::integral INT_T>(const INT_T& val) {
-              return static_cast<std::int64_t>(val);
-          }, value)};
-    }
-
-    auto as_unsigned() const
-    {
-        return std::optional{std::visit(
-          []<std::integral INT_T>(const INT_T& val) {
-              return static_cast<std::uint64_t>(val);
-          }, value)};
-    }
-
-    auto as_double() const
+    constexpr auto as_int() const
     {
         return std::visit(
-          []<std::integral INT_T>(const INT_T& val) {
-              return static_cast<double>(val);
+         []<typename VALUE_T>(const VALUE_T& val) {
+             if constexpr (std::is_convertible_v<VALUE_T, std::intmax_t>) {
+                 return static_cast<std::intmax_t>(val);
+             } else {
+                 return val.as_int();
+             }
+         }, value);
+    }
+
+    constexpr auto as_unsigned() const
+    {
+        return std::visit(
+         []<typename VALUE_T>(const VALUE_T& val) {
+             if constexpr (std::is_convertible_v<VALUE_T, std::uintmax_t>) {
+                 return static_cast<std::uintmax_t>(val);
+             } else {
+                 return val.as_unsigned();
+             }
+         }, value);
+    }
+
+    constexpr auto as_double() const
+    {
+        return std::visit(
+          [&]<typename VALUE_T>(const VALUE_T& val) {
+              if constexpr (std::same_as<VALUE_T, double>) {
+                  return val;
+              } else if constexpr (std::is_convertible_v<VALUE_T, double>) {
+                  return static_cast<double>(val);
+              } else {
+                  return static_cast<double>(as_int());
+              }
           }, value);
     }
 
@@ -163,36 +177,24 @@ struct numeric_union
           value);
     }
 
-    friend constexpr bool operator<=>(const numeric_union& a, const numeric_union& b) {
-        return std::visit([&]<typename A, typename B>(const A& av, const B& bv) {
-            if constexpr (std::same_as<A,B>) {
-                return av <=> bv;
-            } else if constexpr (auto b_value = static_cast<A>(bv); sizeof(A) < sizeof(B)) {
+    friend constexpr std::strong_ordering operator<=>(const numeric_union& a, const numeric_union& b) {
+        return std::visit([&]<typename A, typename B>(const A& av, const B& bv) -> std::strong_ordering {
+            if constexpr (auto b_value = static_cast<A>(bv); sizeof(A) < sizeof(B)) { // NOLINT(bugprone-signed-char-misuse)
                 return b <=> a;
+            } else if constexpr (std::same_as<A,B>) {
+                return av <=> bv;
             } else if constexpr (std::is_signed_v<A> == std::is_signed_v<B>) {
                 return b_value <=> av;
             } else if constexpr (std::is_signed_v<A>) {
-                return av > 0 && av <=> b_value;
+                return av < 0 ? std::strong_ordering::less : av <=> b_value;
             } else {
-                return bv > 0 && av <=> b_value;
+                return bv > 0 ? std::strong_ordering::greater : av <=> b_value;
             }
         }, a.value, b.value);
     }
 
     friend constexpr bool operator==(const numeric_union& a, const numeric_union& b) {
-        return std::visit([&]<typename A, typename B>(const A& av, const B& bv) {
-            if constexpr (std::same_as<A,B>) {
-                return av == bv;
-            } else if constexpr (auto b_value = static_cast<A>(bv); sizeof(A) < sizeof(B)) {
-                return b == a;
-            } else if constexpr (std::is_signed_v<A> == std::is_signed_v<B>) {
-                return b_value == av;
-            } else if constexpr (std::is_signed_v<A>) {
-                return av > 0 && av == b_value;
-            } else {
-                return bv > 0 && av == b_value;
-            }
-        }, a.value, b.value);
+        return (a <=> b) == 0;
     }
 
     value_type value;
@@ -212,9 +214,19 @@ struct numeric_union
                           value);
     }
 
-    explicit operator std::intmax_t()
+    explicit constexpr operator std::int64_t()
     {
         return as_int();
+    }
+
+    explicit constexpr operator std::uint64_t()
+    {
+        return as_unsigned();
+    }
+
+    explicit constexpr operator double()
+    {
+        return as_double();
     }
 };
 
@@ -227,8 +239,15 @@ using int_value = numeric_union<std::int8_t,
                                     std::int64_t,
                                     std::uint64_t>;
 
+static_assert(int_value{std::int8_t{1}} == int_value{std::int16_t{1}});
+static_assert(int_value{2}.as_double() == 2.0);
+static_assert(int_value{2}.as_int() == 2);
+static_assert(int_value{-2}.as_unsigned() == std::numeric_limits<uintmax_t>::max() - 1);
+static_assert(static_cast<std::int64_t>(int_value{3}) == 3);
+static_assert(static_cast<std::uint64_t>(int_value{4}) == 4);
+static_assert(static_cast<double>(int_value{1}) == 1.0);
+
 static_assert(is_numeric<int_value>);
-static_assert(int_value(std::int8_t{1}) == int_value{std::int16_t{1}});
 
 using float_value = numeric_union<float, double>;
 
