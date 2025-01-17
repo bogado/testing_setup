@@ -2,12 +2,15 @@
 #define INCLUDED_TYPES_HPP
 
 #include <bit>
+#include <array>
 #include <compare>
 #include <concepts>
 #include <cstdint>
 #include <optional>
+#include <ranges>
 #include <string_view>
 #include <type_traits>
+#include <utility>
 #include <variant>
 
 namespace vb::msgpack {
@@ -23,12 +26,28 @@ concept is_numeric = requires(const NUMERICAL val) {
     std::convertible_to<NUMERICAL, double>;
 };
 
+template <typename... TYPEs>
+constexpr auto variant_sizeof(std::variant<TYPEs...> var) 
+{
+    return std::visit([]<typename T>(T) { return sizeof(T); }, var);
+}
+
 template<is_numeric... NUMERICs>
 struct numeric_union
 {
     using value_type = std::variant<NUMERICs...>;
 
-    static constexpr auto type_count =  std::variant_size_v<value_type>;
+    static constexpr auto type_count = sizeof...(NUMERICs);
+
+    static constexpr auto prototypes = []<std::size_t ... I>(std::index_sequence<I...>) {
+        return std::array{value_type{std::variant_alternative_t<I, value_type>{}}...};
+    }(std::make_index_sequence<type_count>{});
+
+    static constexpr auto sizes = []() {
+        return prototypes | std::views::transform([](const auto& prototype) {
+                   return variant_sizeof(prototype);
+               });
+    }();
 
     template <std::integral auto I>
     requires(I >= 0 && I < type_count)
@@ -144,13 +163,45 @@ struct numeric_union
           value);
     }
 
+    friend constexpr bool operator<=>(const numeric_union& a, const numeric_union& b) {
+        return std::visit([&]<typename A, typename B>(const A& av, const B& bv) {
+            if constexpr (std::same_as<A,B>) {
+                return av <=> bv;
+            } else if constexpr (auto b_value = static_cast<A>(bv); sizeof(A) < sizeof(B)) {
+                return b <=> a;
+            } else if constexpr (std::is_signed_v<A> == std::is_signed_v<B>) {
+                return b_value <=> av;
+            } else if constexpr (std::is_signed_v<A>) {
+                return av > 0 && av <=> b_value;
+            } else {
+                return bv > 0 && av <=> b_value;
+            }
+        }, a.value, b.value);
+    }
+
+    friend constexpr bool operator==(const numeric_union& a, const numeric_union& b) {
+        return std::visit([&]<typename A, typename B>(const A& av, const B& bv) {
+            if constexpr (std::same_as<A,B>) {
+                return av == bv;
+            } else if constexpr (auto b_value = static_cast<A>(bv); sizeof(A) < sizeof(B)) {
+                return b == a;
+            } else if constexpr (std::is_signed_v<A> == std::is_signed_v<B>) {
+                return b_value == av;
+            } else if constexpr (std::is_signed_v<A>) {
+                return av > 0 && av == b_value;
+            } else {
+                return bv > 0 && av == b_value;
+            }
+        }, a.value, b.value);
+    }
+
     value_type value;
 
     template<typename T>
     requires(std::constructible_from<value_type, T>)
     static constexpr auto index_of = value_type{T{}}.index();
 
-    explicit numeric_union(std::constructible_from<value_type> auto val)
+    explicit constexpr numeric_union(std::convertible_to<value_type> auto val)
       : value{ val }
     {
     }
@@ -177,6 +228,7 @@ using int_value = numeric_union<std::int8_t,
                                     std::uint64_t>;
 
 static_assert(is_numeric<int_value>);
+static_assert(int_value(std::int8_t{1}) == int_value{std::int16_t{1}});
 
 using float_value = numeric_union<float, double>;
 
