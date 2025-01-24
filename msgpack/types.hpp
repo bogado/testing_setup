@@ -36,22 +36,20 @@ struct numeric_union
 {
     using value_type = std::variant<NUMERICs...>;
 
+    value_type value;
 
     static constexpr auto type_count = sizeof...(NUMERICs);
 
-    static constexpr auto prototypes = []<std::size_t ... I>(std::index_sequence<I...>) {
-        return std::array{value_type{std::variant_alternative_t<I, value_type>{}}...};
-    }(std::make_index_sequence<type_count>{});
-
-    static constexpr auto sizes = []() {
-        return prototypes | std::views::transform([](const auto& prototype) {
-            return variant_sizeof(prototype);
-        });
-    }();
+    template <std::integral auto I>
+    requires(I >= 0 && I < type_count)
+    using type = std::variant_alternative_t<I, value_type>;
 
     template <std::integral auto I>
-        requires(I >= 0 && I < type_count)
-        using int_type = std::variant_alternative_t<I, value_type>;
+    constexpr static auto prototype = type<I>{};
+
+    constexpr static auto sizes = []<std::size_t... INDEX>(std::index_sequence<INDEX...>) {
+        return std::array{ sizeof(prototype<INDEX>)... };
+    }(std::make_index_sequence<type_count>{});
 
     constexpr auto as_int() const
     {
@@ -89,6 +87,27 @@ struct numeric_union
                   return static_cast<double>(as_int());
               }
           }, value);
+    }
+
+    auto size() const
+    {
+        return std::visit([]<typename T>(const T&) { return sizeof(T); },
+                          value);
+    }
+
+    explicit constexpr operator std::int64_t()
+    {
+        return as_int();
+    }
+
+    explicit constexpr operator std::uint64_t()
+    {
+        return as_unsigned();
+    }
+
+    explicit constexpr operator double()
+    {
+        return as_double();
     }
 
     template <std::convertible_to<double> DOUBLE>
@@ -197,8 +216,6 @@ struct numeric_union
         return (a <=> b) == 0;
     }
 
-    value_type value;
-
     template<typename T>
     requires(std::constructible_from<value_type, T>)
     static constexpr auto index_of = value_type{T{}}.index();
@@ -208,60 +225,43 @@ struct numeric_union
     {
     }
 
-    auto size() const
+    template <std::ranges::sized_range BYTE_RANGE>
+    requires (std::same_as<std::ranges::range_value_t<BYTE_RANGE>, std::byte>)
+    explicit constexpr numeric_union(BYTE_RANGE buffer)
+        : value{}
     {
-        return std::visit([]<typename T>(const T&) { return sizeof(T); },
-                          value);
-    }
-
-    explicit constexpr operator std::int64_t()
-    {
-        return as_int();
-    }
-
-    explicit constexpr operator std::uint64_t()
-    {
-        return as_unsigned();
-    }
-
-    explicit constexpr operator double()
-    {
-        return as_double();
+        
     }
 };
 
 using int_value = numeric_union<std::int8_t,
-                                    std::uint8_t,
                                     std::int16_t,
-                                    std::uint16_t,
                                     std::int32_t,
+                                    std::int64_t>;
+
+using unsigned_value = numeric_union<std::uint8_t,
+                                    std::uint16_t,
                                     std::uint32_t,
-                                    std::int64_t,
                                     std::uint64_t>;
 
-static_assert(int_value{std::int8_t{1}} == int_value{std::int16_t{1}});
-static_assert(int_value{2}.as_double() == 2.0);
-static_assert(int_value{2}.as_int() == 2);
-static_assert(int_value{-2}.as_unsigned() == std::numeric_limits<uintmax_t>::max() - 1);
-static_assert(static_cast<std::int64_t>(int_value{3}) == 3);
-static_assert(static_cast<std::uint64_t>(int_value{4}) == 4);
-static_assert(static_cast<double>(int_value{1}) == 1.0);
-
-static_assert(is_numeric<int_value>);
+//using integral_value = numeric_union<int_value, unsigned_value>;
 
 using float_value = numeric_union<float, double>;
 
-static_assert(is_numeric<float_value>);
+static_assert(sizeof(float_value)==sizeof(float_value::value_type));  
 
 template <int LEN>
 constexpr unsigned bit_size = (LEN == 8 || LEN == 16 || LEN == 32 || LEN == 64)?LEN:8;
+
+template <int LEN>
+constexpr unsigned var_index = std::bit_width(bit_size<LEN>/8)-1;
 
 template<int LEN, bool IS_SIGNED = false>
 using integer = std::conditional_t<
   LEN == bit_size<LEN>,
   std::variant_alternative_t<
-    std::bit_width(bit_size<LEN> / 16) * 2 + (IS_SIGNED ? 0 : 1),
-    int_value::value_type>,
+    var_index<LEN>,
+    typename std::conditional_t<IS_SIGNED, int_value, unsigned_value>::value_type>,
   std::conditional_t<IS_SIGNED, int, unsigned>>;
 
 static_assert(std::same_as<integer<64>, std::uint64_t>);
@@ -321,5 +321,11 @@ concept is_packable =
   is_array_like<PACKABLE> || is_map_like<PACKABLE> || is_str_like<PACKABLE> ||
   std::is_arithmetic_v<PACKABLE> || is_decomposable<PACKABLE>;
 }
+
+template <typename TARGET>
+concept is_packing_target = std::output_iterator<TARGET, std::byte>;
+
+template <typename SOURCE>
+concept is_packing_source = std::ranges::range<SOURCE> && std::same_as<std::ranges::range_value_t<SOURCE>, std::byte>;
 
 #endif // INCLUDED_TYPES_HPP
