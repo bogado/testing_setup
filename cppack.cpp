@@ -1,4 +1,3 @@
-#include "./all.hpp"
 #include <iostream>
 #include <string>
 #include <cctype>

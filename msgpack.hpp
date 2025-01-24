@@ -8,24 +8,21 @@
 
 namespace vb::msgpack {
 
-template <typename TARGET>
-concept is_packing_target = std::output_iterator<TARGET, std::byte>;
-
-template <typename SOURCE>
-concept is_packing_source = std::ranges::range<SOURCE> && std::same_as<std::ranges::range_value_t<SOURCE>, std::byte>;
-
 template <is_packable TYPE>
-constexpr auto unpack(is_packing_source auto source)
+constexpr auto unpack(is_packing_source auto source, TYPE& result)
 {
     auto traits = format::classification{source.first};
     if (!traits.accepts<TYPE>()) {
-        return std::pair{std::ranges::all_of(source), std::optional<TYPE>{}};
+        return std::ranges::all_of(source);
     } else if (traits.is_value()) {
-        return std::pair{std::ranges::subrange(source, 1), traits.value()};
+        result = traits.value();
+        return std::ranges::subrange(source, 1);
     } else if (traits.count_length() > 0) {
-        
-
-    }
+        std::int64_t count{0};
+        auto rest = traits.read_count(source, count);
+        return traits.read_data(rest, count, result);
+    } 
+    return traits.read_data(source, result);
 }
 
 }
