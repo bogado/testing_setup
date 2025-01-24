@@ -247,6 +247,29 @@ struct traits
             return std::false_type{};
         }
     }();
+
+    template <is_packing_source SOURCE_T, std::integral OUT_TYPE>
+    constexpr auto read_count(is_packing_source auto source, std::integral auto size, OUT_TYPE& count)
+    {
+        count = 0;
+        for (auto value: source | std::views::take(size) |
+         std::views::transform([](std::byte value) { return
+             static_cast<uint8_t>(value); })) {
+            count += value;
+            count <<= 1;
+        }
+        return std::ranges::subrange(source.begin() + size, source.end());
+    }
+
+    template <is_packing_source SOURCE_T, is_packable OUT_TYPE>
+    constexpr auto read_data(is_packing_source auto source, OUT_TYPE& out_data)
+    {
+    }
+
+    template <is_packing_source SOURCE_T, is_packable OUT_TYPE>
+    constexpr auto read_data(is_packing_source auto source, std::integral auto count, OUT_TYPE& out_data)
+    {
+    }
 };
 
 }}
