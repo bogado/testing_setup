@@ -1,17 +1,10 @@
 #include "msgpack/byte_view.hpp"
 
-#include <cstddef>
-#include <iomanip>
-#include <ios>
-#include <iterator>
-#include <type_traits>
-#include <ranges>
 #include <iostream>
 #include <utility>
 #include <format>
-#include <string>
-
-#include "msgpack/byte_view.hpp"
+#include <ranges>
+#include <span>
 
 auto print(const vb::is_basic_type auto arg) {
         auto bytes = vb::byte_view(arg);
