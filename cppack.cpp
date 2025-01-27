@@ -1,6 +1,9 @@
 #include <iostream>
+#include <iterator>
+#include <sstream>
 #include <string>
 #include <cctype>
+#include <print>
 
 #include "./msgpack.hpp"
 
@@ -47,33 +50,26 @@ auto request(std::string_view name, ARGs... args)
 
 */
 
-int main(int argc, const char **argv)
+int main(int, const char **)
 {
-    std::cout << argv[0];
-    return argc;
-    /*
-    using boost::asio::local::stream_protocol;
-
-    if (argc < 2) {
-        std::println("{} <unix socket> \n", argv[0]);
-        return -1;
-    }
-    auto socket_path = std::string_view{argv[1]};
- 
-    stream_protocol::endpoint test{socket_path};
-    stream_protocol::iostream io{test};
-
-    if (!io) {
-        std::cerr << "Could not connect to " << socket_path << "\n";
-        std::cerr << io.error().message() << "\n";
-    }
-
-    auto test_message = message::request("nvim_eval", "\"Hello \" . \"world");
-    
-    while(true) {
-        std::string line;
-        std::getline(io, line);
-        std::cout << line;
-    } 
-    */
+    using namespace vb::msgpack;
+    // NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers)
+    std::string value;
+    unpack(
+      std::array{
+        std::byte{ 0xa3 }, std::byte{ 65 }, std::byte{ 66 }, std::byte{ 67 } },
+      value);
+    std::cout << "string : " << value << "\n";
+    std::size_t int_value{ 2 };
+    unpack(
+      std::array{ std::byte{ 0xcd }, std::byte{ 0x00 }, std::byte{ 0x01 } },
+      int_value);
+    std::cout << "int : " << int_value << "\n";
+    std::array<int, 2> array_value{1,2};
+    unpack(std::array{ std::byte{ 0x92 }, std::byte{ 0x1 }, std::byte{ 0xff } },
+           array_value);
+    std::print("Array value : ");
+    std::ranges::copy(array_value, std::ostream_iterator<int>(std::cout, ", "));
+    std::println();
+    // NOLINTEND(cppcoreguidelines-avoid-magic-numbers)
 }
