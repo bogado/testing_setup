@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <map>
 #include <utility>
+#include <vector>
 
 namespace vb::msgpack {
 enum class type_t : std::uint8_t
@@ -23,22 +24,32 @@ enum class type_t : std::uint8_t
     NO_TYPE
 };
 
-enum class category_t : std::uint8_t
+enum class category_t : std::uint16_t
 {
-    UNKNOWN     = 0b100'0000,
-    SIZED       = 0b010'0000,
-    SIGNED      = 0b001'0000,
-    NUMERIC     = 0b000'1000,
-    VALUE       = 0b000'0100,
-    CONTAINER   = 0b000'0010,
-    FIXED       = 0b000'0001,
-    NO_CATEGORY = 0b000'0000
+    UNKNOWN     = 0b1000'0000'0000,
+    BITS        = 0b0100'0000'0000,
+    BYTES       = 0b0010'0000'0000,
+    SIZED       = 0b0001'0000'0000,
+    SIGNED      = 0b0000'1000'0000,
+    NUMERIC     = 0b0000'0100'0000,
+    VALUE       = 0b0000'0010'0000,
+    CONSTANT    = 0b0000'0001'0000,
+    CONTAINER   = 0b0000'0000'1000,
+    FIXED       = 0b0000'0000'0100,
+    NO_CATEGORY = 0b0000'0000'0000
 };
+
+template <typename T>
+concept is_category_or_type = std::same_as<T, category_t> || std::same_as<T, type_t>;
 
 constexpr category_t operator&(
  const category_t a,
  const category_t b)
 {
+    if (a == category_t::UNKNOWN || b == category_t::UNKNOWN) {
+        return category_t::UNKNOWN;
+    }
+
     return category_t{ static_cast<uint8_t>(std::to_underlying(a) bitand
         std::to_underlying(b)) };
 }
@@ -47,6 +58,10 @@ constexpr category_t operator|(
  const category_t a,
  const category_t b)
 {
+    if (a == category_t::UNKNOWN || b == category_t::UNKNOWN) {
+        return category_t::UNKNOWN;
+    }
+
     return category_t{ static_cast<uint8_t>(std::to_underlying(a) bitor
         std::to_underlying(b)) };
 }
@@ -66,6 +81,8 @@ namespace format {
 struct id {
     std::byte ident;
 
+    constexpr id() = default;
+
     constexpr id(std::byte v)
         : ident{v}
     {}
@@ -78,36 +95,52 @@ struct id {
         std::uint8_t length;
     };
 
-    constexpr const id operator ++(int)
+    constexpr std::uint8_t value() const
     {
-        auto other = *this;
-        ++(*this);
+        return static_cast<uint8_t>(ident);
+    }
+
+    constexpr id &operator +=(std::int8_t increment)
+    {
+        ident = static_cast<std::byte>(value() + increment);
+        return *this;
+    }
+
+    constexpr id operator +(std::int8_t increment) const
+    {
+        return id{static_cast<std::uint8_t>(value() + increment)};
+    }
+
+    constexpr id operator ++(int)
+    {
+        id other = *this;
+        *this += 1;
         return other;
     }
 
     constexpr id &operator ++()
     {
-        ident = static_cast<std::byte>(std::to_underlying(ident)+1);
+        *this += 1;
         return *this;
     }
 
     constexpr id operator++() const {
-        auto other = *this;
-        return ++other;
+        return *this + 1;
     }
 
     constexpr id middle(id other) const {
         return id{static_cast<std::byte>(value() + other.value()/2)};
     }
 
-    constexpr std::uint8_t value() const
-    {
-        return static_cast<uint8_t>(ident);
+    constexpr bool inside(std::pair<id, id> range) {
+        return value() >= range.first.value() &&
+               value() <= range.second.value();
     }
 
     template<typename VALUE_T>
-    requires (sizeof(VALUE_T) == 1) 
-    struct directValue {
+        requires(sizeof(VALUE_T) == 1)
+    struct directValue
+    {
         using value_type = VALUE_T;
         value_type value;
     };
@@ -130,8 +163,10 @@ struct traits
     using enum type_t;
 
     static constexpr category_t category = CATEGORY;
-    static constexpr type_t type = TYPE;
+    static constexpr type_t  type = TYPE;
     static constexpr id format = id{ID};
+
+    id actual;
 
     constexpr static bool is(type_t type_b)
     {
@@ -145,23 +180,40 @@ struct traits
 
     static constexpr bool accepts(id other) 
     {
-        if constexpr (is(VALUE) && is(NUMERIC)) {
-            auto [min, max] = value_range;
-            return other.value() >= min && other.value() <= max;
-        } else {
-           return other == format;
-        }
+        return other.inside(id_range);
     }
+
+    static constexpr auto base_content_size = []() {
+        if constexpr (is(CONTAINER)) {
+            return 0;
+        } else if constexpr (is(BITS)) {
+            return SPEC / 8;
+        } else {
+            return SPEC;
+        }
+    }();
+
+    constexpr auto content_size() const {
+        if constexpr (is(FIXED)) {
+            if constexpr (is(CONTAINER)) {
+                return base_content_size + actual.value() - format.value();
+            } else if constexpr (is(BITS)) {
+                return base_content_size;
+            } else {
+                return std::false_type{};
+            }
+        } else {
+            return std::false_type{};
+        }
+    };
 
     using standard_type =
         std::conditional_t<
-            is(INTEGER) && !is(VALUE), integer<SPEC, is(SIGNED)>,
-        std::conditional_t<
-            is(INTEGER) && is(VALUE), integer<8, is(SIGNED)>,
-        std::conditional_t<
-            is(BOOL), bool,
+            is(INTEGER), integer<base_content_size, is(SIGNED)>,
         std::conditional_t<
             is(FLOAT), floating<bit_size<SPEC>>,
+        std::conditional_t<
+            is(BOOL), bool,
         std::conditional_t<
             is(STR), std::string,
         std::conditional_t<
@@ -174,50 +226,49 @@ struct traits
             is(BIN), std::vector<std::byte>,
         std::conditional<
             is(VOID), std::nullptr_t,
-        std::false_type >>>>>>>>>>;
+        std::false_type >>>>>>>>>;
 
     template<is_packable T>
     static constexpr bool accepts_type =
+      (is(STR) && std::same_as<T, std::string>) ||
       (is(INTEGER) && std::is_integral_v<T>) ||
       (is(FLOAT) && std::is_floating_point_v<T>) ||
       (is(BOOL) && std::same_as<T, bool>) || (is(ARRAY) && is_array_like<T>) ||
       (is(MAP) && is_map_like<T>) || (is(EXT) && is_ext_like<T>) ||
       (is(BIN) && is_buffer_like<T>) || (is(VOID) && std::is_null_pointer_v<T>);
 
-    static constexpr auto value = []() {
+    constexpr auto value() {
         if constexpr (is(VALUE)) {
-            if constexpr(is(BOOL)) {
-                return SPEC == 1;
-            } else if constexpr(is(VOID)) {
+            if constexpr(is(VOID)) {
                 return nullptr;
+            } else if constexpr(is(CONSTANT)) {
+                return static_cast<standard_type>(SPEC);
             } else {
-                return static_cast<standard_type>(format.value());
+                return std::bit_cast<std::int8_t>(actual.value());
             }
         } else {
             return std::false_type{};
         };
-    }();
+    };
 
-    static constexpr auto value_range = []() {
-        if constexpr (is(VALUE)) {
-            if constexpr(is(BOOL) || is(VOID)) {
-                return std::pair{value, value};
+    static constexpr auto id_range = []() {
+        if constexpr (is(VALUE) && !is(CONSTANT)) {
+            id first = format;
+            id second = format + static_cast<std::int8_t>( SPEC );
+            if (is(SIGNED)) {
+                return std::pair{ id{ second }, id{ first } };
             } else {
-                auto first = standard_type{value};
-                auto second = static_cast<standard_type>(first + standard_type{SPEC});
-                if (first < second) {
-                    return std::pair{first, second};
-                } else {
-                    return std::pair{second, first};
-                }
+                return std::pair{ id{ first }, id{ second } };
             }
+        } else if constexpr (is(FIXED)) {
+            return std::pair { format, format + SPEC};
         } else {
-            return std::false_type{};
+            return std::pair{ format, format }; 
         };
     }();
 
     static constexpr bool belongs(id val) {
-        auto range = value_range();
+        auto range = id_range();
         if constexpr (std::same_as<decltype(range), std::false_type>) {
             return false;
         }
@@ -225,52 +276,18 @@ struct traits
     }
 
     static constexpr auto count_bytes = []() {
-        if constexpr (is(CONTAINER)) {
-            return SPEC / 8;
-        } else if constexpr (is(SIZED)) {
-            return SPEC;
-        } else if constexpr (is(VALUE) || is(FIXED)) {
+        if constexpr (is(VALUE) || is(FIXED)) {
             return 0;
+        } else if constexpr (is(BITS)) {
+            return SPEC / 8;
+        } else if constexpr (is(BYTES)) {
+            return SPEC;
         } else {
             return std::false_type{};
         }
     }();
-
-    static constexpr auto content_size = []() {
-        if constexpr (is(FIXED)) {
-            if constexpr (is(NUMERIC)) {
-                return SPEC/8;
-            } else {
-                return SPEC;
-            }
-        } else {
-            return std::false_type{};
-        }
-    }();
-
-    template <is_packing_source SOURCE_T, std::integral OUT_TYPE>
-    constexpr auto read_count(is_packing_source auto source, std::integral auto size, OUT_TYPE& count)
-    {
-        count = 0;
-        for (auto value: source | std::views::take(size) |
-         std::views::transform([](std::byte value) { return
-             static_cast<uint8_t>(value); })) {
-            count += value;
-            count <<= 1;
-        }
-        return std::ranges::subrange(source.begin() + size, source.end());
-    }
-
-    template <is_packing_source SOURCE_T, is_packable OUT_TYPE>
-    constexpr auto read_data(is_packing_source auto source, OUT_TYPE& out_data)
-    {
-    }
-
-    template <is_packing_source SOURCE_T, is_packable OUT_TYPE>
-    constexpr auto read_data(is_packing_source auto source, std::integral auto count, OUT_TYPE& out_data)
-    {
-    }
 };
 
-}}
+}
+}
 #endif // 

@@ -1,14 +1,14 @@
 #ifndef INCLUDED_TYPES_HPP
 #define INCLUDED_TYPES_HPP
 
+#include "./byte_view.hpp"
+
 #include <sys/types.h>
 #include <bit>
 #include <array>
 #include <compare>
 #include <concepts>
 #include <cstdint>
-#include <limits>
-#include <optional>
 #include <ranges>
 #include <string_view>
 #include <type_traits>
@@ -45,11 +45,18 @@ struct numeric_union
     using type = std::variant_alternative_t<I, value_type>;
 
     template <std::integral auto I>
+    requires(I >= 0 && I < type_count)
+    constexpr static auto sizeOf = sizeof(type<I>);
+
+    template <std::integral auto I>
     constexpr static auto prototype = type<I>{};
 
     constexpr static auto sizes = []<std::size_t... INDEX>(std::index_sequence<INDEX...>) {
-        return std::array{ sizeof(prototype<INDEX>)... };
-    }(std::make_index_sequence<type_count>{});
+        return std::array{ sizeOf<INDEX>... };
+    }(std::make_index_sequence<type_count-1>{});
+
+    template <std::size_t SIZE>
+    using type_size = type<std::distance(std::begin(sizes), std::ranges::find(sizes, SIZE))>;
 
     constexpr auto as_int() const
     {
@@ -225,13 +232,11 @@ struct numeric_union
     {
     }
 
-    template <std::ranges::sized_range BYTE_RANGE>
-    requires (std::same_as<std::ranges::range_value_t<BYTE_RANGE>, std::byte>)
-    explicit constexpr numeric_union(BYTE_RANGE buffer)
-        : value{}
-    {
-        
-    }
+    template <std::size_t SIZE>
+    requires(std::ranges::find(sizes, SIZE) != std::end(sizes))
+    explicit constexpr numeric_union(std::array<std::byte, SIZE> buffer)
+        : value{from_bytes<type_size<SIZE>>(buffer)}
+    {}
 };
 
 using int_value = numeric_union<std::int8_t,
@@ -244,6 +249,7 @@ using unsigned_value = numeric_union<std::uint8_t,
                                     std::uint32_t,
                                     std::uint64_t>;
 
+static_assert(int_value{std::array{std::byte{0x10}, std::byte{0x10}}}.as_int() == 0x1010);
 //using integral_value = numeric_union<int_value, unsigned_value>;
 
 using float_value = numeric_union<float, double>;
