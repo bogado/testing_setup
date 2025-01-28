@@ -9,6 +9,7 @@
 #include <compare>
 #include <concepts>
 #include <cstdint>
+#include <map>
 #include <ranges>
 #include <string_view>
 #include <type_traits>
@@ -304,9 +305,11 @@ concept is_decomposable = requires(const CLASS_T val) {
 
 template<typename MAP>
 concept is_map_like = std::ranges::range<MAP> && requires(const MAP& map) {
-            { *map.begin().first() };
-            { *map.begin().second() };
+            { map.begin()->first };
+            { map.begin()->second };
 };
+
+static_assert(is_map_like<std::map<std::string, int>>);
 
 template<typename ARRAY>
 concept is_array_like =
