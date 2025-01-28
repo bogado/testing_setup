@@ -102,9 +102,8 @@ constexpr auto unpack(is_packing_source auto source, [[maybe_unused]] TYPE& resu
     } else if (traits.content_size() > 0) {
         return_value = unpack_n(return_value, traits.content_size(), result);
         return_value = return_value.advance(traits.content_size());
-    }
-    if constexpr (std::is_arithmetic_v<TYPE>) {
-        if (traits.content_size() <= sizeof(TYPE)) {
+    } else if (traits.content_size() <= sizeof(TYPE)) {
+        if constexpr (std::is_arithmetic_v<TYPE>) {
             result = from_bytes<TYPE>(return_value);
             return_value = return_value.advance(sizeof(TYPE));
         } else {
