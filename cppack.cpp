@@ -71,5 +71,26 @@ int main(int, const char **)
     std::print("Array value : ");
     std::ranges::copy(array_value, std::ostream_iterator<int>(std::cout, ", "));
     std::println();
+
+    std::map<std::string, int> map_val{};
+    unpack(std::array{ std::byte{ 0x83 },
+        std::byte{0xa1}, std::byte{'a'}, 
+        std::byte{ 0x1 },
+        std::byte{0xa2}, std::byte{'a'}, std::byte{'b'},
+        std::byte{ 0x2 },
+        std::byte{0xa3}, std::byte{'a'}, std::byte{'b'}, std::byte{'c'}, 
+        std::byte{ 0x3 }
+    }, map_val);
+    std::print("Map value : {{");
+    auto first = true;
+    for (auto [key, value] : map_val) {
+        if (first) {
+            first = false;
+        } else {
+            std::cout << ",";
+        }
+        std::cout << " '" << key << "': " << value;
+    }
+    std::cout << "} \n";
     // NOLINTEND(cppcoreguidelines-avoid-magic-numbers)
 }
