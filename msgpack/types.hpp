@@ -249,8 +249,8 @@ using unsigned_value = numeric_union<std::uint8_t,
                                     std::uint32_t,
                                     std::uint64_t>;
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-magic-numbers)
 static_assert(int_value{std::array{std::byte{0x10}, std::byte{0x10}}}.as_int() == 0x1010);
-//using integral_value = numeric_union<int_value, unsigned_value>;
 
 using float_value = numeric_union<float, double>;
 
