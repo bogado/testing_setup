@@ -59,7 +59,7 @@ struct classification
     using MAP_16 = format::traits<MAP, CONTAINER | BITS, 0xde, 16>;
     using MAP_32 = format::traits<MAP, CONTAINER | BITS, 0xdf, 32>;
     using NEGATIVE_FIX_INT =
-      format::traits<INTEGER, NUMERIC | SIGNED | VALUE, 0xe0, -0x1f>;
+      format::traits<INTEGER, NUMERIC | SIGNED | VALUE, 0xe0, 0x1f>;
 
     // NOLINTEND(cppcoreguidelines-avoid-magic-numbers)
     using traits_type = std::variant<
@@ -225,6 +225,9 @@ static_assert(classification::POSITIVE_FIX_INT::id_range.second.value() == 0x7f)
 static_assert(classification::POSITIVE_FIX_INT::accepts(3));
 static_assert(!classification::POSITIVE_FIX_INT::accepts(130));
 static_assert(classification::NEGATIVE_FIX_INT{0xff}.value() == -1);
+static_assert(classification::NEGATIVE_FIX_INT::id_range.first.value() == 0xe0);
+static_assert(classification::NEGATIVE_FIX_INT::id_range.second.value() == 0xff);
+static_assert(classification::NEGATIVE_FIX_INT::accepts(0xff));
 static_assert(classification::FALSE::accepts(0xc2));
 static_assert(classification::FIX_STR::accepts(0xa2));
 static_assert(classification{std::byte{0xa2}}.is(classification::STR));

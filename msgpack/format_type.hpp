@@ -254,12 +254,8 @@ struct traits
     static constexpr auto id_range = []() {
         if constexpr (is(VALUE) && !is(CONSTANT)) {
             id first = format;
-            id second = format + static_cast<std::int8_t>( SPEC );
-            if (is(SIGNED)) {
-                return std::pair{ id{ second }, id{ first } };
-            } else {
+            id second = format + SPEC;
                 return std::pair{ id{ first }, id{ second } };
-            }
         } else if constexpr (is(FIXED)) {
             return std::pair { format, format + SPEC};
         } else {
