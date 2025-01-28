@@ -14,73 +14,115 @@
 #include <source_location>
 #include <stdexcept>
 #include <type_traits>
+#include <utility>
 
 namespace vb::msgpack {
 
+namespace details {
+
+template <typename T>
+struct remove_all_const {
+    using type = std::remove_const_t<T>;
+};
+
+template <typename T1, typename T2>
+struct remove_all_const<std::pair<T1, T2>>
+{
+    using type = std::pair<std::remove_const_t<T1>, std::remove_const_t<T2>>;
+};
+
+template <typename... Ts>
+struct remove_all_const<std::tuple<Ts...>>
+{
+    using type = std::tuple<std::remove_const_t<Ts>...>;
+};
+
+template <typename T>
+using remove_all_const_t = remove_all_const<T>::type;
+
+static_assert(std::same_as <
+              remove_all_const_t<std::pair<const std::string, int>>,
+                                 std::pair<std::string, int>>);
+}
+
 template <is_packable TYPE>
-constexpr auto unpack(is_packing_source auto source, [[maybe_unused]] TYPE& result, std::source_location location = std::source_location::current()) 
+constexpr inline auto unpack(is_packing_source auto source, [[maybe_unused]] TYPE& result, std::source_location location = std::source_location::current());
+
+template<is_packing_source SOURCE_TYPE, typename TYPE>
+constexpr inline auto
+unpack_n(const SOURCE_TYPE& source,
+         std::unsigned_integral auto count,
+         TYPE& result)
+{
+    auto return_value = std::ranges::subrange(source);
+    if constexpr (std::same_as<TYPE, std::string>) {
+        auto source_view = source | std::views::take(count) |
+                           std::views::transform(
+                             [](std::byte c) { return static_cast<char>(c); });
+        std::ranges::copy(source_view, std::back_inserter(result));
+        return_value = return_value.advance(std::size(result));
+    } else if constexpr (is_array_like<TYPE> || is_map_like<TYPE>) {
+        if constexpr (requires {
+                          { result.clear() };
+                      }) {
+            result.clear();
+            if constexpr (requires {
+                              { result.reserve(count) };
+                          }) {
+                result.reserve(count);
+            }
+        }
+
+        using value_type =
+          details::remove_all_const_t<std::ranges::range_value_t<TYPE>>;
+        auto output
+          [[maybe_unused]] =
+            [&](std::integral auto count [[maybe_unused]]) {
+                if constexpr (is_map_like<TYPE>) {
+                    return std::inserter(result, std::end(result));
+                } else if constexpr (requires { result.push_back(value_type{}); }) {
+                    return std::back_inserter(result);
+                } else if constexpr (std::ranges::sized_range<TYPE>) {
+                    if (std::size(result) < count) {
+                        throw std::logic_error("Size of container does not support " + std::to_string(count) + " elements at " + std::source_location::current().function_name());
+                    }
+                    return std::begin(result);
+                }
+                throw std::logic_error{std::string{"cannot form a output iterator at "} + std::source_location::current().function_name()};
+            };
+
+        std::ranges::generate_n(
+          output(count), count, [&return_value]() -> value_type {
+              value_type next{};
+              if constexpr (is_array_like<TYPE>) {
+                  return_value = unpack(return_value, next);
+              } else {
+                  auto& [key, value] = next;
+                  return_value = unpack(return_value, key);
+                  return_value = unpack(return_value, value);
+              }
+              return next;
+          });
+    }
+    return return_value;
+};
+
+template <is_packable TYPE>
+constexpr inline auto unpack(is_packing_source auto source, [[maybe_unused]] TYPE& result, std::source_location location) 
 {
     using namespace format;
     using std::ranges::subrange;
 
-    constexpr auto unpack_n = []<is_packing_source SOURCE_TYPE>(const SOURCE_TYPE& source,
-                                 std::unsigned_integral auto count,
-                                 TYPE& result) {
-        auto return_value = std::ranges::subrange(source);
-        if constexpr (std::same_as<TYPE, std::string>) {
-            auto source_view = source | std::views::take(count) |
-                               std::views::transform([](std::byte c) {
-                                   return static_cast<char>(c);
-                               });
-            std::ranges::copy(source_view, std::back_inserter(result));
-            return_value = return_value.advance(std::size(result));
-        } else if constexpr (is_array_like<TYPE> || is_map_like<TYPE>) {
-            if constexpr (requires {
-                              { result.clear() };
-                          }) {
-                result.clear();
-                if constexpr (requires {
-                                  { result.reserve(count) };
-                              }) {
-                    result.reserve(count);
-                }
-            }
-
-            using value_type = std::ranges::range_value_t<TYPE>;
-            auto output = [&]() {
-                if constexpr (requires { result.push_back(value_type{}); }) {
-                    return std::back_inserter(result);
-                } else if constexpr (requires {
-                                         result.insert(value_type{});
-                                     }) {
-                    return std::inserter(result, std::begin(result));
-                } else if constexpr (std::tuple_size_v<TYPE> > 0) {
-                    return std::begin(result);
-                }
-            }();
-
-            std::ranges::generate_n(output, count, [&return_value]() {
-                value_type next{};
-                if constexpr (is_array_like<TYPE>) {
-                    return_value = unpack(return_value, next);
-                } else {
-                    return_value = unpack(return_value, next.first);
-                    return_value = unpack(return_value, next.second);
-                }
-                    return next;
-            });
-        }
-        return return_value;
-    };
 
     auto return_value = subrange(source);
-    auto traits = classification{ source.front() };
+    auto traits = classification{ return_value.front() };
+
     if (!traits.accepts<TYPE>()) {
         std::string error = std::format("{}:{} at {} : type is not acceptable by the format {:x} ({:x})", location.file_name(),location.line(), std::source_location::current().function_name(), traits.format_id().value(), traits.main_format_id().value());
         throw std::domain_error(error);
     }
-    return_value = return_value.advance(1);
 
+    return_value = return_value.advance(1);
     if (traits.is_value()) {
         if constexpr (std::is_integral_v<TYPE>) {
             result = static_cast<TYPE>(traits.value().value_or(0));
@@ -99,9 +141,8 @@ constexpr auto unpack(is_packing_source auto source, [[maybe_unused]] TYPE& resu
             std::ranges::copy(data | std::views::take(count), data.begin());
             result = from_bytes<TYPE>(data);
         }
-    } else if (traits.content_size() > 0) {
-        return_value = unpack_n(return_value, traits.content_size(), result);
-        return_value = return_value.advance(traits.content_size());
+    } else if (auto content_size = traits.content_size(); content_size > 0) {
+        return_value = unpack_n(return_value, content_size, result);
     } else if (traits.content_size() <= sizeof(TYPE)) {
         if constexpr (std::is_arithmetic_v<TYPE>) {
             result = from_bytes<TYPE>(return_value);
