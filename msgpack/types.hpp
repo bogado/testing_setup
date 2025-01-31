@@ -18,6 +18,20 @@
 
 namespace vb::msgpack {
 
+enum class type_t : std::uint8_t
+{
+    INTEGER,
+    BOOL,
+    FLOAT,
+    STR,
+    ARRAY,
+    MAP,
+    EXT,
+    VOID,
+    BIN,
+    NO_TYPE
+};
+
 template<typename NUMERICAL>
 concept is_numeric = requires(const NUMERICAL val) {
     { val + val } -> std::convertible_to<NUMERICAL>;

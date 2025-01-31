@@ -10,19 +10,6 @@
 #include <vector>
 
 namespace vb::msgpack {
-enum class type_t : std::uint8_t
-{
-    INTEGER,
-    BOOL,
-    FLOAT,
-    STR,
-    ARRAY,
-    MAP,
-    EXT,
-    VOID,
-    BIN,
-    NO_TYPE
-};
 
 enum class category_t : std::uint16_t
 {
