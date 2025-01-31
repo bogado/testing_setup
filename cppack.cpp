@@ -1,6 +1,4 @@
 #include <iostream>
-#include <istream>
-#include <iterator>
 #include <ranges>
 #include <string>
 #include <cctype>
@@ -43,14 +41,6 @@ struct payload {
         
     }
 };
-/*
-template <typename ... ARGs>
-auto request(std::string_view name, ARGs... args)
-{
-    return vb::packer{}(payload{type::REQUEST, std::string{name}, std::move(args)...});
-}
-
-*/
 
 template <vb::msgpack::is_packable TYPE, std::uint8_t... DATA>
 TYPE test_unpack()
@@ -107,25 +97,23 @@ int main(int, const char **)
               << "\n";
 
     std::cout << "vector : "
-              << test_unpack<std::vector<std::uint16_t>, 0x98, 0xff, 0xfe, 0xfd, 4, 5, 6, 7, 8>()
+              << test_unpack<std::vector<std::int16_t>, 0x98, 0xff, 0xfe, 0xfd, 4, 5, 6, 7, 8>()
               << "\n";
 
     std::cout << "Map : "
               << test_unpack<std::map<std::string, int>,
                              0x83,
-                             0xa1,
-                             'a',
+                             0xa1, 'a',
                              0x01,
-                             0xa2,
-                             'a',
-                             'b',
+                             0xa2, 'a', 'b',
                              0x02,
-                             0xa3,
-                             'a',
-                             'b',
-                             'c',
+                             0xa3, 'a', 'b', 'c',
                              0x03>()
               << "\n";
+
+    std::cout << "String with size : "
+              << test_unpack<std::string,
+        0xd9, 4, 't', 'e', 's', 't'>() << '\n';
 
     // NOLINTEND(cppcoreguidelines-avoid-magic-numbers)
 }

@@ -13,17 +13,16 @@ namespace vb::msgpack {
 
 enum class category_t : std::uint16_t
 {
-    UNKNOWN     = 0b1000'0000'0000,
-    BITS        = 0b0100'0000'0000,
-    BYTES       = 0b0010'0000'0000,
-    SIZED       = 0b0001'0000'0000,
-    SIGNED      = 0b0000'1000'0000,
-    NUMERIC     = 0b0000'0100'0000,
-    VALUE       = 0b0000'0010'0000,
-    CONSTANT    = 0b0000'0001'0000,
-    CONTAINER   = 0b0000'0000'1000,
-    FIXED       = 0b0000'0000'0100,
-    NO_CATEGORY = 0b0000'0000'0000
+    BITS        = 0b1000'0000,
+    SIZED       = 0b0100'0000,
+    SIGNED      = 0b0010'0000,
+    NUMERIC     = 0b0001'0000,
+    VALUE       = 0b0000'1000,
+    CONSTANT    = 0b0000'0100,
+    CONTAINER   = 0b0000'0010,
+    FIXED       = 0b0000'0001,
+    NO_CATEGORY = 0b0000'0000,
+    UNKNOWN     = 0b1111'1111
 };
 
 template <typename T>
@@ -55,7 +54,8 @@ constexpr category_t operator|(
 
 constexpr bool is_valid(category_t category)
 {
-    return category != category_t::NO_CATEGORY;
+    return category != category_t::NO_CATEGORY
+        && category != category_t::UNKNOWN;
 }
 
 constexpr bool is_valid(type_t type)
@@ -192,10 +192,8 @@ struct traits
         if constexpr (is(FIXED)) {
             if constexpr (is(CONTAINER)) {
                 return base_content_size + actual.value() - format.value();
-            } else if constexpr (is(BITS)) {
-                return base_content_size;
             } else {
-                return std::false_type{};
+                return spec_length;
             }
         } else {
             return std::false_type{};

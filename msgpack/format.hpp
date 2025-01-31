@@ -46,11 +46,11 @@ struct classification
       format::traits<INTEGER, NUMERIC | BITS | SIGNED | FIXED, 0xd2, 32>;
     using INT_64 =
       format::traits<INTEGER, NUMERIC | BITS | SIGNED | FIXED, 0xd3, 64>;
-    using FIXEXT_1 = format::traits<EXT, FIXED | BYTES | SIZED, 0xd4, 1>;
-    using FIXEXT_2 = format::traits<EXT, FIXED | BYTES | SIZED, 0xd5, 2>;
-    using FIXEXT_4 = format::traits<EXT, FIXED | BYTES | SIZED, 0xd6, 4>;
-    using FIXEXT_8 = format::traits<EXT, FIXED | BYTES | SIZED, 0xd7, 8>;
-    using FIXEXT_16 = format::traits<EXT, FIXED | BYTES | SIZED, 0xd8, 16>;
+    using FIXEXT_1 = format::traits<EXT, FIXED | SIZED, 0xd4, 1>;
+    using FIXEXT_2 = format::traits<EXT, FIXED | SIZED, 0xd5, 2>;
+    using FIXEXT_4 = format::traits<EXT, FIXED | SIZED, 0xd6, 4>;
+    using FIXEXT_8 = format::traits<EXT, FIX| SIZED, 0xd7, 8>;
+    using FIXEXT_16 = format::traits<EXT, FIXED | SIZED, 0xd8, 16>;
     using STR_8 = format::traits<STR, CONTAINER | BITS, 0xd9, 8>;
     using STR_16 = format::traits<STR, CONTAINER | BITS, 0xda, 16>;
     using STR_32 = format::traits<STR, CONTAINER | BITS, 0xdb, 32>;
@@ -237,6 +237,7 @@ static_assert(classification::FIX_ARRAY::is(classification::FIXED));
 static_assert(classification{std::byte{0x93}}.content_size() == 3);
 static_assert(classification{std::byte{0x93}}.accepts<std::array<int, 3>>());
 static_assert(classification{std::byte{0x93}}.accepts<std::array<unsigned, 3>>());
+static_assert(classification{std::byte{0xd9}}.main_format_id() == 0xd9);
 // NOLINTEND(cppcoreguidelines-avoid-magic-numbers)
 
 }
