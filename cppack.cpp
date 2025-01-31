@@ -1,10 +1,11 @@
 #include <iostream>
-#include <iterator>
+#include <ranges>
 #include <string>
 #include <cctype>
 #include <print>
 
 #include "./msgpack.hpp"
+#include "msgpack/types.hpp"
 
 namespace message
 {
@@ -40,56 +41,79 @@ struct payload {
         
     }
 };
-/*
-template <typename ... ARGs>
-auto request(std::string_view name, ARGs... args)
+
+template <vb::msgpack::is_packable TYPE, std::uint8_t... DATA>
+TYPE test_unpack()
 {
-    return vb::packer{}(payload{type::REQUEST, std::string{name}, std::move(args)...});
+    TYPE result{};
+    vb::msgpack::unpack(std::array{std::byte{DATA}...}, result);
+    return result;
 }
 
-*/
+std::ostream& operator<<(std::ostream& out, const std::ranges::viewable_range auto& range)
+requires( !requires{ range.begin()->first; } && !std::same_as<decltype(range), const std::string&>)
+{
+    bool first = true;
+    out << "[ ";
+    for (auto value: range) {
+        if (first) {
+            first = !first;
+        } else {
+            out << ", ";
+        }
+        out << value;
+    }
+    out << " ]";
+    return out;
+}
+
+std::ostream& operator<<(std::ostream& out, const std::ranges::viewable_range auto& map)
+requires( requires{ map.begin()->first; })
+{
+    bool first = true;
+    out << "{ ";
+    for (auto [key, value] : map) {
+        if (first) {
+            first = !first;
+        } else {
+            out << ", ";
+        }
+        out << key << ": "<< value;
+    }
+    out << " }";
+    return out;
+}
 
 int main(int, const char **)
 {
-    using namespace vb::msgpack;
     // NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers)
-    std::string value;
-    unpack(
-      std::array{
-        std::byte{ 0xa3 }, std::byte{ 65 }, std::byte{ 66 }, std::byte{ 67 } },
-      value);
-    std::cout << "string : " << value << "\n";
-    std::size_t int_value{ 2 };
-    unpack(
-      std::array{ std::byte{ 0xcd }, std::byte{ 0x00 }, std::byte{ 0x01 } },
-      int_value);
-    std::cout << "int : " << int_value << "\n";
-    std::array<int, 2> array_value{1,2};
-    unpack(std::array{ std::byte{ 0x92 }, std::byte{ 0x1 }, std::byte{ 0xff } },
-           array_value);
-    std::print("Array value : ");
-    std::ranges::copy(array_value, std::ostream_iterator<int>(std::cout, ", "));
-    std::println();
+    std::cout << "string : " << test_unpack<std::string, 0xa3, 'A', 'b', 'C'>()
+              << "\n";
 
-    std::map<std::string, int> map_val{};
-    unpack(std::array{ std::byte{ 0x83 },
-        std::byte{0xa1}, std::byte{'a'}, 
-        std::byte{ 0x1 },
-        std::byte{0xa2}, std::byte{'a'}, std::byte{'b'},
-        std::byte{ 0x2 },
-        std::byte{0xa3}, std::byte{'a'}, std::byte{'b'}, std::byte{'c'}, 
-        std::byte{ 0x3 }
-    }, map_val);
-    std::print("Map value : {{");
-    auto first = true;
-    for (auto [key, value] : map_val) {
-        if (first) {
-            first = false;
-        } else {
-            std::cout << ",";
-        }
-        std::cout << " '" << key << "': " << value;
-    }
-    std::cout << "} \n";
+    std::cout << "int : " << test_unpack<int, 0xcd, 0x00, 0x01>() << "\n";
+
+    std::cout << "array : "
+              << test_unpack<std::array<int, 3>, 0x93, 0xff, 2, 3>()
+              << "\n";
+
+    std::cout << "vector : "
+              << test_unpack<std::vector<std::int16_t>, 0x98, 0xff, 0xfe, 0xfd, 4, 5, 6, 7, 8>()
+              << "\n";
+
+    std::cout << "Map : "
+              << test_unpack<std::map<std::string, int>,
+                             0x83,
+                             0xa1, 'a',
+                             0x01,
+                             0xa2, 'a', 'b',
+                             0x02,
+                             0xa3, 'a', 'b', 'c',
+                             0x03>()
+              << "\n";
+
+    std::cout << "String with size : "
+              << test_unpack<std::string,
+        0xd9, 4, 't', 'e', 's', 't'>() << '\n';
+
     // NOLINTEND(cppcoreguidelines-avoid-magic-numbers)
 }

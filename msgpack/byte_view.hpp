@@ -10,6 +10,7 @@
 #include <cstddef>
 #include <span>
 #include <algorithm>
+#include <string>
 
 namespace vb {
 
