@@ -170,13 +170,21 @@ struct traits
         return other.inside(id_range);
     }
 
-    static constexpr auto base_content_size = []() {
-        if constexpr (is(CONTAINER)) {
+    static constexpr auto spec_length = []() {
+        if constexpr (is(VALUE) || is(FIXED)) {
             return 0;
         } else if constexpr (is(BITS)) {
             return SPEC / 8;
         } else {
             return SPEC;
+        } 
+    }();
+
+    static constexpr auto base_content_size = []() {
+        if constexpr (is(CONTAINER)) {
+            return 0;
+        } else {
+            return spec_length;
         }
     }();
 
@@ -257,18 +265,6 @@ struct traits
         }
         return val.value() >= range.first && val.value() <= range.second;
     }
-
-    static constexpr auto count_bytes = []() {
-        if constexpr (is(VALUE) || is(FIXED)) {
-            return 0;
-        } else if constexpr (is(BITS)) {
-            return SPEC / 8;
-        } else if constexpr (is(BYTES)) {
-            return SPEC;
-        } else {
-            return std::false_type{};
-        }
-    }();
 };
 
 }

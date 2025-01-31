@@ -163,7 +163,7 @@ struct classification
 
     constexpr auto count_length() const {
         return visitor([]<typename TRAITS_T>(TRAITS_T) -> std::size_t {
-                return TRAITS_T::count_bytes;
+                return TRAITS_T::spec_length;
         }, 0);
     }
 
