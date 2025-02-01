@@ -140,8 +140,12 @@ struct id_type {
             val.value()}
     {}
 
-    constexpr bool operator==(const id&) const = default;
-    constexpr bool operator!=(const id&) const = default;
+    constexpr bool operator==(const id_type&) const = default;
+    constexpr bool operator!=(const id_type&) const = default;
+
+    friend std::ostream& operator <<(std::ostream& out, id_type id) {
+        return out << "ID{" << std::hex << id.value() << "}";
+    }
 };
 
 template <type_t TYPE, category_t CATEGORY, std::uint8_t ID, std::int8_t SPEC>
