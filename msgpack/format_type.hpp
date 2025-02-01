@@ -4,6 +4,7 @@
 #include "./types.hpp"
 
 #include <any>
+#include <concepts>
 #include <cstdint>
 #include <map>
 #include <ostream>
@@ -14,14 +15,14 @@ namespace vb::msgpack {
 
 enum class category_t : std::uint16_t
 {
-    BITS        = 0b1000'0000,
-    SIZED       = 0b0100'0000,
-    SIGNED      = 0b0010'0000,
+    BINARY      = 0b0100'0000,
+    UNSIGNED    = 0b0010'0000, 
     NUMERIC     = 0b0001'0000,
-    VALUE       = 0b0000'1000,
-    CONSTANT    = 0b0000'0100,
-    CONTAINER   = 0b0000'0010,
-    FIXED       = 0b0000'0001,
+    STATIC      = 0b0000'1000,
+    CONTAINER   = 0b0000'0100,
+    FIXED       = 0b0000'0010,
+    VALUE       = 0b0000'0001,
+
     NO_CATEGORY = 0b0000'0000,
     UNKNOWN     = 0b1111'1111
 };
@@ -148,15 +149,54 @@ struct id_type {
     }
 };
 
-template <type_t TYPE, category_t CATEGORY, std::uint8_t ID, std::int8_t SPEC>
+struct spec {
+    static constexpr category_t category = category_t::UNKNOWN;
+    static constexpr std::uint8_t length = 0;
+    static constexpr std::uint8_t bit_length = length * 8;
+
+    static constexpr auto acceptable_range(id_type format) { return std::pair{format, format}; }
+};
+
+template <std::uint8_t BIT_SIZE, category_t CATEGORY>
+struct bit_spec : spec {
+    static constexpr category_t category = CATEGORY;
+    static constexpr std::uint8_t length = BIT_SIZE / 8;
+};
+
+template <std::uint8_t BYTE_SIZE, category_t CATEGORY>
+struct byte_spec : spec {
+    static constexpr category_t category = CATEGORY;
+    static constexpr std::uint8_t length = BYTE_SIZE;
+};
+
+template <std::uint8_t SPAN, category_t CATEGORY>
+struct range_spec : spec {
+    static constexpr category_t category = CATEGORY;
+
+    static constexpr std::pair<id_type, id_type> acceptable_range(id_type format) { return {format, format + SPAN }; } 
+};
+
+template <auto VALUE>
+struct value_spec : spec {
+    static constexpr auto category = category_t::VALUE | category_t::STATIC;
+    static constexpr auto value = VALUE;
+};
+
+namespace test { using enum category_t; 
+static_assert(bit_spec<16, NO_CATEGORY>::length == byte_spec<2, NO_CATEGORY>::length);
+}
+
+template <type_t TYPE, std::derived_from<spec> SPEC, id_type BASE_ID>
 struct traits
 {
     using enum category_t;
     using enum type_t;
+    using spec_type = SPEC;
 
-    static constexpr category_t category = CATEGORY;
-    static constexpr type_t  type = TYPE;
-    static constexpr id_type format = id_type{ID};
+    static constexpr auto category = spec_type::category;
+    static constexpr auto type = TYPE;
+    static constexpr auto format = BASE_ID;
+    static constexpr auto id_range = spec_type::acceptable_range(format);
 
     id_type actual;
 
@@ -178,10 +218,8 @@ struct traits
     static constexpr auto spec_length = []() {
         if constexpr (is(VALUE) || is(FIXED)) {
             return 0;
-        } else if constexpr (is(BITS)) {
-            return SPEC / 8;
         } else {
-            return SPEC;
+            return SPEC::length;
         } 
     }();
 
@@ -195,21 +233,17 @@ struct traits
 
     constexpr auto content_size() const {
         if constexpr (is(FIXED)) {
-            if constexpr (is(CONTAINER)) {
-                return base_content_size + actual.value() - format.value();
-            } else {
-                return spec_length;
-            }
+            return actual.value() - format.value();
         } else {
-            return std::false_type{};
+            return SPEC::length;
         }
     };
 
     using standard_type =
         std::conditional_t<
-            is(INTEGER), integer<base_content_size, is(SIGNED)>,
+            is(INTEGER), integer<base_content_size, !is(UNSIGNED)>,
         std::conditional_t<
-            is(FLOAT), floating<bit_size<SPEC>>,
+            is(FLOAT), floating<SPEC::bit_length>,
         std::conditional_t<
             is(BOOL), bool,
         std::conditional_t<
@@ -219,7 +253,7 @@ struct traits
         std::conditional_t<
             is(MAP), std::map<std::any, std::any>,
         std::conditional_t< 
-            is(EXT), ext<bit_size<SPEC>>,
+            is(EXT), ext<SPEC::length>,
         std::conditional_t<
             is(BIN), std::vector<std::byte>,
         std::conditional<
@@ -239,8 +273,8 @@ struct traits
         if constexpr (is(VALUE)) {
             if constexpr(is(VOID)) {
                 return nullptr;
-            } else if constexpr(is(CONSTANT)) {
-                return static_cast<standard_type>(SPEC);
+            } else if constexpr(is(STATIC)) {
+                return SPEC::value;
             } else {
                 return std::bit_cast<std::int8_t>(actual.value());
             }
@@ -248,18 +282,6 @@ struct traits
             return std::false_type{};
         };
     };
-
-    static constexpr auto id_range = []() {
-        if constexpr (is(VALUE) && !is(CONSTANT)) {
-            id_type first = format;
-            id_type second = format + SPEC;
-                return std::pair{ id_type{ first }, id_type{ second } };
-        } else if constexpr (is(FIXED)) {
-            return std::pair { format, format + SPEC};
-        } else {
-            return std::pair{ format, format }; 
-        };
-    }();
 
     static constexpr bool belongs(id_type val) {
         auto range = id_range();

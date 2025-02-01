@@ -1,42 +1,51 @@
 #ifndef INCLUDED_BYTE_VIEW_HPP
 #define INCLUDED_BYTE_VIEW_HPP
 
+#include <algorithm>
 #include <array>
 #include <bit>
 #include <concepts>
-#include <ranges>
-#include <stdexcept>
-#include <type_traits>
 #include <cstddef>
+#include <ranges>
 #include <span>
-#include <algorithm>
+#include <stdexcept>
 #include <string>
+#include <type_traits>
 
 namespace vb {
 
-template <typename T>
+template<typename T>
 concept is_basic_type = std::is_fundamental_v<T>;
 
-template <typename VALUE_TYPE = std::byte>
-requires std::same_as<unsigned char, std::make_unsigned_t<VALUE_TYPE>> || std::same_as<std::byte, VALUE_TYPE>
-constexpr auto byte_view(const is_basic_type auto& value) {
+template<typename VALUE_TYPE = std::byte>
+    requires std::same_as<unsigned char, std::make_unsigned_t<VALUE_TYPE>> ||
+             std::same_as<std::byte, VALUE_TYPE>
+constexpr auto
+byte_view(const is_basic_type auto& value)
+{
     return std::bit_cast<std::array<std::byte, sizeof(value)>>(value);
 }
 
-template <typename TYPE, std::size_t SIZE, template <typename, std::size_t> typename VIEW>
-constexpr TYPE from_bytes(VIEW<std::byte, SIZE> byte_view)
+template<typename TYPE,
+         std::size_t SIZE,
+         template<typename, std::size_t> typename VIEW>
+constexpr TYPE
+from_bytes(VIEW<std::byte, SIZE> byte_view)
 {
     if constexpr (std::same_as<std::string, TYPE>) {
-        auto view = std::ranges::transform_view(byte_view, [](std::byte b) { return static_cast<char>(b); });
-        return std::string{std::begin(view), std::end(view)};
+        auto view = std::ranges::transform_view(
+          byte_view, [](std::byte b) { return static_cast<char>(b); });
+        return std::string{ std::begin(view), std::end(view) };
     } else {
         return std::bit_cast<TYPE>(byte_view);
     }
 }
 
-template <typename TYPE, std::ranges::sized_range VIEW>
-requires(std::same_as<std::ranges::range_value_t<VIEW>, std::byte> && !std::same_as<std::array<std::byte, sizeof(TYPE)>, VIEW>)
-constexpr TYPE from_bytes(const VIEW& data)
+template<typename TYPE, std::ranges::sized_range VIEW>
+    requires(std::same_as<std::ranges::range_value_t<VIEW>, std::byte> &&
+             !std::same_as<std::array<std::byte, sizeof(TYPE)>, VIEW>)
+constexpr TYPE
+from_bytes(const VIEW& data)
 {
     if (std::size(data) <= sizeof(TYPE)) {
         std::array<std::byte, sizeof(TYPE)> data_array{};
@@ -47,7 +56,10 @@ constexpr TYPE from_bytes(const VIEW& data)
     }
 }
 
-static_assert(from_bytes<std::string>(std::array{std::byte{65}, std::byte{66}, std::byte{67}}) == "ABC"); // NOLINT(cppcoreguidelines-avoid-magic-numbers)
+static_assert(from_bytes<std::string>(std::array{ std::byte{ 65 },
+                                                  std::byte{ 66 },
+                                                  std::byte{ 67 } }) ==
+              "ABC"); // NOLINT(cppcoreguidelines-avoid-magic-numbers)
 
 }
 

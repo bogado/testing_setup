@@ -9,7 +9,9 @@
 #include <array>
 #include <concepts>
 #include <format>
+#include <iostream>
 #include <iterator>
+#include <numeric>
 #include <ranges>
 #include <source_location>
 #include <stdexcept>
@@ -113,7 +115,6 @@ constexpr inline auto unpack(is_packing_source auto source, [[maybe_unused]] TYP
     using namespace format;
     using std::ranges::subrange;
 
-
     auto return_value = subrange(source);
     auto traits = classification{ return_value.front() };
 
@@ -130,19 +131,30 @@ constexpr inline auto unpack(is_packing_source auto source, [[maybe_unused]] TYP
             throw std::logic_error(
              "is_value is not compatible with this type");
         }
-    } else if (traits.count_length() > 0) {
-        std::size_t count{ 0 };
-        return_value = traits.read_count(source, count);
-        if constexpr (std::same_as<TYPE, std::string> || is_array_like<TYPE> ||
-                      is_map_like<TYPE>) {
-            return_value = unpack_n(return_value, count, result);
+    } else if (auto content_size = traits.content_size(); content_size > 0) {
+        if constexpr (std::same_as<TYPE, std::string> || is_array_like<TYPE> || is_map_like<TYPE>) {
+            return_value = unpack_n(return_value, content_size, result);
+        } else if (traits.is(type_t::INTEGER)) {
+            if constexpr(std::integral<TYPE>) {
+            auto partial_source = subrange(return_value,content_size) | std::views::transform([](auto byte) { return static_cast<uint8_t>(byte); });
+            result = std::accumulate(std::begin(partial_source), std::end(partial_source), TYPE{0}, [](TYPE value, auto next) {
+                return value << 8 + next;
+            });
+            return_value = return_value.advance(content_size);
+            } else {
+                throw std::logic_error("Invalid type");
+            }
         } else {
             auto data = std::array<std::byte, sizeof(TYPE)>{};
-            std::ranges::copy(data | std::views::take(count), data.begin());
+            std::ranges::copy(return_value | std::views::take(content_size), data.begin());
             result = from_bytes<TYPE>(data);
+            return_value = return_value.advance(content_size);
         }
-    } else if (auto content_size = traits.content_size(); content_size > 0) {
-        return_value = unpack_n(return_value, content_size, result);
+    } else if (auto count_len = traits.count_length(); count_len > 0) {
+        std::size_t count{0};
+        return_value = traits.read_count(source, count);
+            return_value = unpack_n(return_value, content_size, result);
+        unpack_n(return_value, count, result);
     } else if (traits.content_size() <= sizeof(TYPE)) {
         if constexpr (std::is_arithmetic_v<TYPE>) {
             result = from_bytes<TYPE>(return_value);
@@ -162,6 +174,7 @@ static_assert([]() {
       value);
     return value.size();
 }() == 2);
+#if 0
 static_assert([]() {
     std::size_t value{ 2 };
     unpack(
@@ -169,7 +182,6 @@ static_assert([]() {
       value);
     return value;
 }() == 0x100);
-#if 0
 static_assert(
  []() {
      std::array<int, 2> value;
