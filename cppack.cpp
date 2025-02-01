@@ -90,7 +90,8 @@ int main(int, const char **)
     std::cout << "string : " << test_unpack<std::string, 0xa3, 'A', 'b', 'C'>()
               << "\n";
 
-    std::cout << "int : " << test_unpack<int, 0xcd, 0x00, 0x01>() << "\n";
+    std::cout << "int : " << test_unpack<int, 0xcd, 0x01, 0x00>() << "\n";
+    std::cout << "float : " << test_unpack<float, 0xcd, 0x01, 0x00>() << "\n";
 
     std::cout << "array : "
               << test_unpack<std::array<int, 3>, 0x93, 0xff, 2, 3>()

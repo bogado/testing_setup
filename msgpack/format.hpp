@@ -17,48 +17,48 @@ struct classification
     using enum category_t;
 
     // NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers)
-    using POSITIVE_FIX_INT = format::traits<INTEGER, VALUE | NUMERIC, 0, 0x7f>;
-    using FIX_MAP = format::traits<MAP, CONTAINER | FIXED, 0x80, 0xf>;
-    using FIX_ARRAY = format::traits<ARRAY, CONTAINER | FIXED, 0x90, 0xf>;
-    using FIX_STR = format::traits<STR, CONTAINER | FIXED, 0xa0, 0x1f>;
-    using NIL = format::traits<VOID, VALUE, 0xc0, 0>;
-    using UNUSED = format::traits<VOID, UNKNOWN, 0xc1, 1>;
-    using FALSE = format::traits<BOOL, VALUE | CONSTANT, 0xc2, 2>;
-    using TRUE = format::traits<BOOL, VALUE | CONSTANT, 0xc3, 1>;
-    using BIN_8 = format::traits<BIN, BITS, 0xc4, 8>;
-    using BIN_16 = format::traits<BIN, BITS, 0xc5, 16>;
-    using BIN_32 = format::traits<BIN, BITS, 0xc6, 32>;
-    using EXT_8 = format::traits<EXT, BITS, 0xc7, 8>;
-    using EXT_16 = format::traits<EXT, BITS, 0xc8, 16>;
-    using EXT_32 = format::traits<EXT, BITS, 0xc9, 32>;
-    using FLOAT_32 = format::traits<FLOAT, NUMERIC | BITS | SIGNED, 0xca, 32>;
-    using FLOAT_64 = format::traits<FLOAT, NUMERIC | BITS | SIGNED, 0xcb, 64>;
-    using UINT_8 = format::traits<INTEGER, NUMERIC | BITS, 0xcc, 8>;
-    using UINT_16 = format::traits<INTEGER, NUMERIC | BITS, 0xcd, 16>;
-    using UINT_32 = format::traits<INTEGER, NUMERIC | BITS, 0xce, 32>;
-    using UINT_64 = format::traits<INTEGER, NUMERIC | BITS, 0xcf, 8>;
+    using POSITIVE_FIX_INT = format::traits<INTEGER, range_spec<0x7f, VALUE | NUMERIC | UNSIGNED>, id{0}>;
+    using FIX_MAP = format::traits<MAP, range_spec<0xf, CONTAINER | FIXED>, id{0x80}>;
+    using FIX_ARRAY = format::traits<ARRAY, range_spec<0xf, CONTAINER | FIXED>, id{0x90}>;
+    using FIX_STR = format::traits<STR, range_spec<0x1f, CONTAINER | FIXED>, id{0xa0}>;
+    using NIL = format::traits<VOID, spec, id{0xc0}>;
+    using UNUSED = format::traits<VOID, spec, id{0xc1}>;
+    using FALSE = format::traits<BOOL, value_spec<false>, id{0xc2}>;
+    using TRUE = format::traits<BOOL, value_spec<true>, id{0xc3}>;
+    using BIN_8 = format::traits<BIN, bit_spec<8, BINARY>, id{0xc4}>;
+    using BIN_16 = format::traits<BIN, bit_spec<16, BINARY >, id{0xc5}>;
+    using BIN_32 = format::traits<BIN, bit_spec<32, BINARY>, id{0xc6}>;
+    using EXT_8 = format::traits<EXT, bit_spec<8, BINARY>, id{0xc7}>;
+    using EXT_16 = format::traits<EXT, bit_spec<16, BINARY>, id{0xc8}>;
+    using EXT_32 = format::traits<EXT, bit_spec<32, BINARY>, id{0xc9}>;
+    using FLOAT_32 = format::traits<FLOAT, bit_spec<32, NUMERIC>, id{0xca}>;
+    using FLOAT_64 = format::traits<FLOAT, bit_spec<64, NUMERIC>, id{0xcb}>;
+    using UINT_8 = format::traits<INTEGER, bit_spec<8,  NUMERIC | UNSIGNED>, id{0xcc}>;
+    using UINT_16 = format::traits<INTEGER, bit_spec<16, NUMERIC | UNSIGNED>, id{0xcd}>;
+    using UINT_32 = format::traits<INTEGER, bit_spec<32, NUMERIC | UNSIGNED>, id{0xce}>;
+    using UINT_64 = format::traits<INTEGER, bit_spec<8, NUMERIC | UNSIGNED>, id{0xcf}>;
     using INT_8 =
-      format::traits<INTEGER, NUMERIC | BITS | SIGNED, 0xd0, 8>;
+      format::traits<INTEGER, bit_spec<8, NUMERIC>, id{0xd0}>;
     using INT_16 =
-      format::traits<INTEGER, NUMERIC | BITS | SIGNED, 0xd1, 16>;
+      format::traits<INTEGER, bit_spec<16, NUMERIC>, id{0xd1}>;
     using INT_32 =
-      format::traits<INTEGER, NUMERIC | BITS | SIGNED, 0xd2, 32>;
+      format::traits<INTEGER, bit_spec<32, NUMERIC>, id{0xd2}>;
     using INT_64 =
-      format::traits<INTEGER, NUMERIC | BITS | SIGNED, 0xd3, 64>;
-    using FIXEXT_1 = format::traits<EXT, SIZED, 0xd4, 1>;
-    using FIXEXT_2 = format::traits<EXT, SIZED, 0xd5, 2>;
-    using FIXEXT_4 = format::traits<EXT, SIZED, 0xd6, 4>;
-    using FIXEXT_8 = format::traits<EXT, SIZED, 0xd7, 8>;
-    using FIXEXT_16 = format::traits<EXT, SIZED, 0xd8, 16>;
-    using STR_8 = format::traits<STR, CONTAINER | BITS, 0xd9, 8>;
-    using STR_16 = format::traits<STR, CONTAINER | BITS, 0xda, 16>;
-    using STR_32 = format::traits<STR, CONTAINER | BITS, 0xdb, 32>;
-    using ARRAY_16 = format::traits<ARRAY, CONTAINER | BITS, 0xdc, 16>;
-    using ARRAY_32 = format::traits<ARRAY, CONTAINER | BITS, 0xdd, 32>;
-    using MAP_16 = format::traits<MAP, CONTAINER | BITS, 0xde, 16>;
-    using MAP_32 = format::traits<MAP, CONTAINER | BITS, 0xdf, 32>;
+      format::traits<INTEGER, bit_spec<64, NUMERIC>, id{0xd3}>;
+    using FIXEXT_1 = format::traits<EXT, byte_spec<1, STATIC>, id{0xd4}>;
+    using FIXEXT_2 = format::traits<EXT, byte_spec<2, STATIC>, id{0xd5}>;
+    using FIXEXT_4 = format::traits<EXT, byte_spec<4, STATIC>, id{0xd6}>;
+    using FIXEXT_8 = format::traits<EXT, byte_spec<8, STATIC>, id{0xd7}>;
+    using FIXEXT_16 = format::traits<EXT, byte_spec<16, STATIC>, id{0xd8}>;
+    using STR_8 = format::traits<STR, bit_spec<8, CONTAINER>, id{0xd9}>;
+    using STR_16 = format::traits<STR, bit_spec<16, CONTAINER>, id{0xda}>;
+    using STR_32 = format::traits<STR, bit_spec<32, CONTAINER>, id{0xdb}>;
+    using ARRAY_16 = format::traits<ARRAY, bit_spec<16, CONTAINER>, id{0xdc}>;
+    using ARRAY_32 = format::traits<ARRAY, bit_spec<32, CONTAINER>, id{0xdd}>;
+    using MAP_16 = format::traits<MAP, bit_spec<16, CONTAINER>, id{0xde}>;
+    using MAP_32 = format::traits<MAP, bit_spec<32, CONTAINER>, id{0xdf}>;
     using NEGATIVE_FIX_INT =
-      format::traits<INTEGER, NUMERIC | SIGNED | VALUE, 0xe0, 0x1f>;
+      format::traits<INTEGER, range_spec<0x1f, NUMERIC | VALUE>, id{0xe0}>;
 
     // NOLINTEND(cppcoreguidelines-avoid-magic-numbers)
     using traits_type = std::variant<
@@ -120,19 +120,31 @@ struct classification
       : traits{ traits_for(val) }
     {}
 
-    template <typename INVOCABLE_T, typename RESULT_T>
-    constexpr auto visitor(INVOCABLE_T invocable, RESULT_T default_value, std::source_location location [[maybe_unused]] = std::source_location::current()) const {
-        return std::visit([invocable, default_value, &location]<typename ARGUMENT_T>(ARGUMENT_T value) -> RESULT_T {
-            if constexpr (std::same_as<std::monostate, ARGUMENT_T>) {
-                throw std::domain_error("Invalid traits setup.");
-            } else if constexpr (!std::invocable<INVOCABLE_T, ARGUMENT_T> ) {
-                throw std::logic_error(std::string("Invalid visitor ") + location.function_name() + " for id: " + std::to_string(ARGUMENT_T::format.value()));
-            } else if constexpr (std::same_as<std::invoke_result_t<INVOCABLE_T, ARGUMENT_T>, std::false_type>) {
-                return default_value;
-            } else {
-                return invocable(value);
-            }
-        }, traits);
+    template<typename INVOCABLE_T, typename RESULT_T>
+    constexpr auto visitor(INVOCABLE_T invocable,
+                           RESULT_T default_value,
+                           std::source_location location [[maybe_unused]] =
+                             std::source_location::current()) const
+    {
+        return std::visit(
+          [invocable, default_value, &location]<typename ARGUMENT_T>(
+            ARGUMENT_T value) -> RESULT_T {
+              if constexpr (std::same_as<std::monostate, ARGUMENT_T>) {
+                  throw std::domain_error("Invalid traits setup.");
+              } else if constexpr (!std::invocable<INVOCABLE_T, ARGUMENT_T>) {
+                  throw std::logic_error(
+                    std::string("Invalid visitor ") + location.function_name() +
+                    " for id: " + std::to_string(ARGUMENT_T::format.value()));
+              } else if constexpr (std::same_as<
+                                     std::invoke_result_t<INVOCABLE_T,
+                                                          ARGUMENT_T>,
+                                     std::false_type>) {
+                  return default_value;
+              } else {
+                  return invocable(value);
+              }
+          },
+          traits);
     }
 
     constexpr id main_format_id() const {
@@ -217,8 +229,7 @@ struct classification
 
 // NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers)
 static_assert(classification::POSITIVE_FIX_INT::is(classification::VALUE));
-static_assert(!classification::POSITIVE_FIX_INT::is(classification::CONSTANT));
-static_assert(!classification::POSITIVE_FIX_INT::is(classification::SIGNED));
+static_assert(!classification::POSITIVE_FIX_INT::is(classification::STATIC));
 static_assert(classification::POSITIVE_FIX_INT::id_range.first.value() == 0);
 static_assert(classification::POSITIVE_FIX_INT::id_range.second.value() == 0x7f);
 static_assert(classification::POSITIVE_FIX_INT::accepts(3));
@@ -236,8 +247,8 @@ static_assert(classification::FIX_ARRAY::is(classification::FIXED));
 static_assert(classification{std::byte{0x93}}.content_size() == 3);
 static_assert(classification{std::byte{0x93}}.accepts<std::array<int, 3>>());
 static_assert(classification{std::byte{0x93}}.accepts<std::array<unsigned, 3>>());
-static_assert(classification{std::byte{0xcd}}.content_size() == 0);
 static_assert(classification{std::byte{0xd9}}.traits.index() == 23);
+static_assert(classification{std::byte{0xcd}}.content_size() == 2);
 // NOLINTEND(cppcoreguidelines-avoid-magic-numbers)
 
 }
