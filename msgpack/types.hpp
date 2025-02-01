@@ -4,6 +4,7 @@
 #include "./byte_view.hpp"
 
 #include <sys/types.h>
+#include <any>
 #include <bit>
 #include <array>
 #include <compare>
@@ -15,6 +16,7 @@
 #include <type_traits>
 #include <utility>
 #include <variant>
+#include <vector>
 
 namespace vb::msgpack {
 
@@ -31,6 +33,34 @@ enum class type_t : std::uint8_t
     BIN,
     NO_TYPE
 };
+
+template<type_t TYPE>
+using standard_type = std::conditional_t<
+  TYPE == type_t::INTEGER,
+  std::intmax_t,
+  std::conditional_t<
+    TYPE == type_t::FLOAT,
+    double,
+    std::conditional_t<
+      TYPE == type_t::BOOL,
+      bool,
+      std::conditional_t<
+        TYPE == type_t::STR,
+        std::string,
+        std::conditional_t<
+          TYPE == type_t::ARRAY,
+          std::vector<std::any>,
+          std::conditional_t<
+            TYPE == type_t::MAP,
+            std::map<std::any, std::any>,
+            std::conditional_t<
+              TYPE == type_t::EXT,
+              std::any,
+              std::conditional_t<TYPE == type_t::BIN,
+                                 std::vector<std::byte>,
+                                 std::conditional<TYPE == type_t::VOID,
+                                                  std::nullptr_t,
+                                                  std::false_type>>>>>>>>>;
 
 template<typename NUMERICAL>
 concept is_numeric = requires(const NUMERICAL val) {

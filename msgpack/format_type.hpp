@@ -239,26 +239,6 @@ struct traits
         }
     };
 
-    using standard_type =
-        std::conditional_t<
-            is(INTEGER), integer<base_content_size, !is(UNSIGNED)>,
-        std::conditional_t<
-            is(FLOAT), floating<SPEC::bit_length>,
-        std::conditional_t<
-            is(BOOL), bool,
-        std::conditional_t<
-            is(STR), std::string,
-        std::conditional_t<
-            is(ARRAY), std::vector<std::any>,
-        std::conditional_t<
-            is(MAP), std::map<std::any, std::any>,
-        std::conditional_t< 
-            is(EXT), ext<SPEC::length>,
-        std::conditional_t<
-            is(BIN), std::vector<std::byte>,
-        std::conditional<
-            is(VOID), std::nullptr_t,
-        std::false_type >>>>>>>>>;
 
     template<is_packable T>
     static constexpr bool accepts_type =
