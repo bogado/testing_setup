@@ -49,7 +49,7 @@ struct classification
     using FIXEXT_1 = format::traits<EXT, FIXED | SIZED, 0xd4, 1>;
     using FIXEXT_2 = format::traits<EXT, FIXED | SIZED, 0xd5, 2>;
     using FIXEXT_4 = format::traits<EXT, FIXED | SIZED, 0xd6, 4>;
-    using FIXEXT_8 = format::traits<EXT, FIX| SIZED, 0xd7, 8>;
+    using FIXEXT_8 = format::traits<EXT, FIXED | SIZED, 0xd7, 8>;
     using FIXEXT_16 = format::traits<EXT, FIXED | SIZED, 0xd8, 16>;
     using STR_8 = format::traits<STR, CONTAINER | BITS, 0xd9, 8>;
     using STR_16 = format::traits<STR, CONTAINER | BITS, 0xda, 16>;
@@ -106,8 +106,8 @@ struct classification
     constexpr traits_type traits_for(std::byte index)
     {
         if constexpr (!std::same_as<trait_num<INDICE>, std::monostate>) {
-            if (trait_num<INDICE>::accepts(format::id{index})) {
-                return trait_num<INDICE>{id{index}};
+            if (trait_num<INDICE>::accepts(format::id_type{index})) {
+                return trait_num<INDICE>{id_type{index}};
             }
             return traits_for<INDICE+1>(index);
         } else {
@@ -136,16 +136,16 @@ struct classification
         }, traits);
     }
 
-    constexpr id main_format_id() const {
+    constexpr id_type main_format_id() const {
         return visitor([]<typename TYPE>(const TYPE&) {
             return TYPE::format;
-        }, id{});
+        }, id_type{});
     }
 
-    constexpr id format_id() const {
+    constexpr id_type format_id() const {
         return visitor([](const auto& format) {
             return format.actual;
-        }, id{});
+        }, id_type{});
     }
 
     constexpr bool is(is_category_or_type auto val) const

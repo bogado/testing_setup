@@ -6,6 +6,7 @@
 #include <any>
 #include <cstdint>
 #include <map>
+#include <ostream>
 #include <utility>
 #include <vector>
 
@@ -65,16 +66,16 @@ constexpr bool is_valid(type_t type)
 
 namespace format {
 
-struct id {
+struct id_type {
     std::byte ident;
 
-    constexpr id() = default;
+    constexpr id_type() = default;
 
-    constexpr id(std::byte v)
+    constexpr id_type(std::byte v)
         : ident{v}
     {}
 
-    constexpr id(std::uint8_t v)
+    constexpr id_type(std::uint8_t v)
       : ident{ v }
     {}
 
@@ -87,39 +88,39 @@ struct id {
         return static_cast<uint8_t>(ident);
     }
 
-    constexpr id &operator +=(std::int8_t increment)
+    constexpr id_type &operator +=(std::int8_t increment)
     {
         ident = static_cast<std::byte>(value() + increment);
         return *this;
     }
 
-    constexpr id operator +(std::int8_t increment) const
+    constexpr id_type operator +(std::int8_t increment) const
     {
-        return id{static_cast<std::uint8_t>(value() + increment)};
+        return id_type{static_cast<std::uint8_t>(value() + increment)};
     }
 
-    constexpr id operator ++(int)
+    constexpr id_type operator ++(int)
     {
-        id other = *this;
+        id_type other = *this;
         *this += 1;
         return other;
     }
 
-    constexpr id &operator ++()
+    constexpr id_type &operator ++()
     {
         *this += 1;
         return *this;
     }
 
-    constexpr id operator++() const {
+    constexpr id_type operator++() const {
         return *this + 1;
     }
 
-    constexpr id middle(id other) const {
-        return id{static_cast<std::byte>(value() + other.value()/2)};
+    constexpr id_type middle(id_type other) const {
+        return id_type{static_cast<std::byte>(value() + other.value()/2)};
     }
 
-    constexpr bool inside(std::pair<id, id> range) {
+    constexpr bool inside(std::pair<id_type, id_type> range) {
         return value() >= range.first.value() &&
                value() <= range.second.value();
     }
@@ -134,7 +135,7 @@ struct id {
 
     template<typename VALUE_T>
     requires (sizeof(VALUE_T) == 1) 
-    constexpr id(id predecessor, directValue<VALUE_T> val, VALUE_T value) :
+    constexpr id_type(id_type predecessor, directValue<VALUE_T> val, VALUE_T value) :
         ident{predecessor.value() + value -
             val.value()}
     {}
@@ -151,9 +152,9 @@ struct traits
 
     static constexpr category_t category = CATEGORY;
     static constexpr type_t  type = TYPE;
-    static constexpr id format = id{ID};
+    static constexpr id_type format = id_type{ID};
 
-    id actual;
+    id_type actual;
 
     constexpr static bool is(type_t type_b)
     {
@@ -165,7 +166,7 @@ struct traits
         return is_valid(FMT_TYPE & category);
     }
 
-    static constexpr bool accepts(id other) 
+    static constexpr bool accepts(id_type other) 
     {
         return other.inside(id_range);
     }
@@ -246,9 +247,9 @@ struct traits
 
     static constexpr auto id_range = []() {
         if constexpr (is(VALUE) && !is(CONSTANT)) {
-            id first = format;
-            id second = format + SPEC;
-                return std::pair{ id{ first }, id{ second } };
+            id_type first = format;
+            id_type second = format + SPEC;
+                return std::pair{ id_type{ first }, id_type{ second } };
         } else if constexpr (is(FIXED)) {
             return std::pair { format, format + SPEC};
         } else {
@@ -256,7 +257,7 @@ struct traits
         };
     }();
 
-    static constexpr bool belongs(id val) {
+    static constexpr bool belongs(id_type val) {
         auto range = id_range();
         if constexpr (std::same_as<decltype(range), std::false_type>) {
             return false;
