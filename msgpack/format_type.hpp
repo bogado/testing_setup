@@ -3,13 +3,10 @@
 
 #include "./types.hpp"
 
-#include <any>
 #include <concepts>
 #include <cstdint>
-#include <map>
 #include <ostream>
 #include <utility>
-#include <vector>
 
 namespace vb::msgpack {
 

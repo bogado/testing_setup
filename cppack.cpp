@@ -91,7 +91,7 @@ int main(int, const char **)
               << "\n";
 
     std::cout << "int : " << test_unpack<int, 0xcd, 0x01, 0x00>() << "\n";
-    std::cout << "float : " << test_unpack<float, 0xcd, 0x01, 0x00>() << "\n";
+    std::cout << "float : " << test_unpack<float, 0xca, 0x80, 0x00, 0x00>() << "\n";
 
     std::cout << "array : "
               << test_unpack<std::array<int, 3>, 0x93, 0xff, 2, 3>()

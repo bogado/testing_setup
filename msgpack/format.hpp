@@ -215,7 +215,7 @@ struct classification
     template <is_packing_source SOURCE_T, is_packable OUT_TYPE>
     constexpr auto read_data(is_packing_source auto source, OUT_TYPE& out_data) const
     {
-        out_data = from_bytes<OUT_TYPE>(source);
+        out_data = container_from_bytes<OUT_TYPE>(source);
         return std::ranges::subrange(std::begin(source) + sizeof(OUT_TYPE), std::end(source));
     }
 

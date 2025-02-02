@@ -13,6 +13,7 @@
 #include <map>
 #include <ranges>
 #include <string_view>
+#include <tuple>
 #include <type_traits>
 #include <utility>
 #include <variant>
@@ -62,13 +63,6 @@ using standard_type = std::conditional_t<
                                                   std::nullptr_t,
                                                   std::false_type>>>>>>>>>;
 
-template<typename NUMERICAL>
-concept is_numeric = requires(const NUMERICAL val) {
-    { val + val } -> std::convertible_to<NUMERICAL>;
-    { val *val } -> std::convertible_to<NUMERICAL>;
-    { 1 * val } -> std::convertible_to<NUMERICAL>;
-    { 1.0 * val } -> std::convertible_to<NUMERICAL>;
-} && std::three_way_comparable_with<NUMERICAL, NUMERICAL>;
 
 template <typename... TYPEs>
 constexpr auto variant_sizeof(std::variant<TYPEs...> var) 
@@ -76,230 +70,29 @@ constexpr auto variant_sizeof(std::variant<TYPEs...> var)
     return std::visit([]<typename T>(T) { return sizeof(T); }, var);
 }
 
-template<is_numeric... NUMERICs>
-struct numeric_union
-{
-    using value_type = std::variant<NUMERICs...>;
+template <typename T1, typename ... Ts>
+constexpr auto not_anyof = ((!std::same_as<T1, Ts>) && ... && true);
 
-    value_type value;
-
-    static constexpr auto type_count = sizeof...(NUMERICs);
-
-    template <std::integral auto I>
-    requires(I >= 0 && I < type_count)
-    using type = std::variant_alternative_t<I, value_type>;
-
-    template <std::integral auto I>
-    requires(I >= 0 && I < type_count)
-    constexpr static auto sizeOf = sizeof(type<I>);
-
-    template <std::integral auto I>
-    constexpr static auto prototype = type<I>{};
-
-    constexpr static auto sizes = []<std::size_t... INDEX>(std::index_sequence<INDEX...>) {
-        return std::array{ sizeOf<INDEX>... };
-    }(std::make_index_sequence<type_count-1>{});
-
-    template <std::size_t SIZE>
-    using type_size = type<std::distance(std::begin(sizes), std::ranges::find(sizes, SIZE))>;
-
-    constexpr auto as_int() const
-    {
-        return std::visit(
-         []<typename VALUE_T>(const VALUE_T& val) {
-             if constexpr (std::is_convertible_v<VALUE_T, std::intmax_t>) {
-                 return static_cast<std::intmax_t>(val);
-             } else {
-                 return val.as_int();
-             }
-         }, value);
+template <typename T, typename... Ts>
+constexpr auto all_different = []() {
+    if constexpr(sizeof...(Ts) > 0) {
+        return not_anyof<T, Ts...> && all_different<Ts...>;
+    } else {
+        return true;
     }
+}();
 
-    constexpr auto as_unsigned() const
-    {
-        return std::visit(
-         []<typename VALUE_T>(const VALUE_T& val) {
-             if constexpr (std::is_convertible_v<VALUE_T, std::uintmax_t>) {
-                 return static_cast<std::uintmax_t>(val);
-             } else {
-                 return val.as_unsigned();
-             }
-         }, value);
-    }
+template <typename... Ts>
+requires (all_different<Ts...>)
+using type_set = std::variant<Ts...>;
 
-    constexpr auto as_double() const
-    {
-        return std::visit(
-          [&]<typename VALUE_T>(const VALUE_T& val) {
-              if constexpr (std::same_as<VALUE_T, double>) {
-                  return val;
-              } else if constexpr (std::is_convertible_v<VALUE_T, double>) {
-                  return static_cast<double>(val);
-              } else {
-                  return static_cast<double>(as_int());
-              }
-          }, value);
-    }
+using int_value =
+  type_set<std::int8_t, std::int16_t, std::int32_t, std::int64_t>;
 
-    auto size() const
-    {
-        return std::visit([]<typename T>(const T&) { return sizeof(T); },
-                          value);
-    }
+using unsigned_value =
+  type_set<std::uint8_t, std::uint16_t, std::uint32_t, std::uint64_t>;
 
-    explicit constexpr operator std::int64_t()
-    {
-        return as_int();
-    }
-
-    explicit constexpr operator std::uint64_t()
-    {
-        return as_unsigned();
-    }
-
-    explicit constexpr operator double()
-    {
-        return as_double();
-    }
-
-    template <std::convertible_to<double> DOUBLE>
-    requires(!std::is_integral_v<DOUBLE>)
-    numeric_union operator* (DOUBLE& other) const {
-        return std::visit(
-         [&]<typename T>(const T& val) {
-             return numeric_union{val * static_cast<double>(other)};
-         }, value);
-    }
-
-    numeric_union operator* (const std::convertible_to<std::int64_t> auto& other) const {
-        return std::visit(
-         [&]<typename T>(const T& val) {
-             return numeric_union{val * static_cast<std::int64_t>(other)};
-         }, value);
-    }
-
-    friend numeric_union operator* (const std::convertible_to<int> auto& other, const numeric_union& self) {
-        return self * other;
-    }
-
-    numeric_union operator* (const numeric_union& other) const {
-        return std::visit(
-         [&]<typename T>(const T& val) {
-             if constexpr (std::is_floating_point_v<T>) {
-                 return numeric_union{val * other.as_double().value()};
-             } else if constexpr (std::is_integral_v<T>) {
-                 return numeric_union{val * other.as_unsigned()};
-             } else {
-                 return numeric_union{val * other};
-             }
-         }, value);
-    }
-
-    numeric_union operator/ (const numeric_union& other) const {
-        return std::visit(
-         [&]<typename T>(const T& val) {
-             if constexpr (std::is_floating_point_v<T>) {
-                 return numeric_union{val / other.as_double()};
-             } else if constexpr (std::is_integral_v<T>) {
-                 return numeric_union{val / other.as_int()};
-             } else {
-                 return numeric_union{val / other};
-             }
-         }, value);
-    }
-
-    numeric_union operator+ (const numeric_union& other) const {
-        return std::visit(
-         [&]<typename T>(const T& val) {
-             if constexpr (std::is_floating_point_v<T>) {
-                 return numeric_union{static_cast<T>(val + other.as_double())};
-             } else if constexpr (std::is_integral_v<T>) {
-                 return numeric_union{static_cast<T>(val + other.as_int())};
-             } else {
-                 return numeric_union{val + other};
-             }
-         }, value);
-    }
-
-    numeric_union operator- (const numeric_union& other) const {
-        return std::visit(
-         [&]<typename T>(const T& val) {
-             if constexpr (std::is_floating_point_v<T>) {
-                 return numeric_union{static_cast<T>(val - other.as_double())};
-             } else if constexpr (std::is_signed_v<T>) {
-                 return numeric_union{static_cast<T>(val - other.as_int())};
-             } else {
-                 return numeric_union{val - other};
-            }
-         }, value);
-    }
-
-    numeric_union operator- () const {
-        return std::visit(
-          [&]<typename T>(const T& val) {
-              if constexpr (std::is_floating_point_v<T> ||
-                            std::is_signed_v<T>)
-              {
-                  return numeric_union{ static_cast<T>(-val) };
-              } else {
-                  return numeric_union{ -val };
-              }
-          },
-          value);
-    }
-
-    friend constexpr std::strong_ordering operator<=>(const numeric_union& a, const numeric_union& b) {
-        return std::visit([&]<typename A, typename B>(const A& av, const B& bv) -> std::strong_ordering {
-            if constexpr (auto b_value = static_cast<A>(bv); sizeof(A) < sizeof(B)) { // NOLINT(bugprone-signed-char-misuse)
-                return b <=> a;
-            } else if constexpr (std::same_as<A,B>) {
-                return av <=> bv;
-            } else if constexpr (std::is_signed_v<A> == std::is_signed_v<B>) {
-                return b_value <=> av;
-            } else if constexpr (std::is_signed_v<A>) {
-                return av < 0 ? std::strong_ordering::less : av <=> b_value;
-            } else {
-                return bv > 0 ? std::strong_ordering::greater : av <=> b_value;
-            }
-        }, a.value, b.value);
-    }
-
-    friend constexpr bool operator==(const numeric_union& a, const numeric_union& b) {
-        return (a <=> b) == 0;
-    }
-
-    template<typename T>
-    requires(std::constructible_from<value_type, T>)
-    static constexpr auto index_of = value_type{T{}}.index();
-
-    explicit constexpr numeric_union(std::convertible_to<value_type> auto val)
-      : value{ val }
-    {
-    }
-
-    template <std::size_t SIZE>
-    requires(std::ranges::find(sizes, SIZE) != std::end(sizes))
-    explicit constexpr numeric_union(std::array<std::byte, SIZE> buffer)
-        : value{from_bytes<type_size<SIZE>>(buffer)}
-    {}
-};
-
-using int_value = numeric_union<std::int8_t,
-                                    std::int16_t,
-                                    std::int32_t,
-                                    std::int64_t>;
-
-using unsigned_value = numeric_union<std::uint8_t,
-                                    std::uint16_t,
-                                    std::uint32_t,
-                                    std::uint64_t>;
-
-// NOLINTNEXTLINE(cppcoreguidelines-avoid-magic-numbers)
-static_assert(int_value{std::array{std::byte{0x10}, std::byte{0x10}}}.as_int() == 0x1010);
-
-using float_value = numeric_union<float, double>;
-
-static_assert(sizeof(float_value)==sizeof(float_value::value_type));  
+using float_value = type_set<float, double>;
 
 template <int LEN>
 constexpr unsigned bit_size = (LEN == 8 || LEN == 16 || LEN == 32 || LEN == 64)?LEN:8;
@@ -312,14 +105,14 @@ using integer = std::conditional_t<
   LEN == bit_size<LEN>,
   std::variant_alternative_t<
     var_index<LEN>,
-    typename std::conditional_t<IS_SIGNED, int_value, unsigned_value>::value_type>,
+    std::conditional_t<IS_SIGNED, int_value, unsigned_value>>,
   std::conditional_t<IS_SIGNED, int, unsigned>>;
 
 static_assert(std::same_as<integer<64>, std::uint64_t>);
 static_assert(std::same_as<integer<32, true>, std::int32_t>);
 
 template<unsigned LEN>
-using floating = std::variant_alternative_t<std::bit_width(LEN/64)+float_value::index_of<float>, float_value::value_type>;
+using floating = std::variant_alternative_t<std::bit_width(LEN/64), float_value>;
 
 static_assert(std::same_as<floating<32>, float>);
 

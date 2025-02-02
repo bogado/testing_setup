@@ -7,9 +7,9 @@
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <concepts>
 #include <format>
-#include <iostream>
 #include <iterator>
 #include <numeric>
 #include <ranges>
@@ -47,8 +47,11 @@ static_assert(std::same_as <
                                  std::pair<std::string, int>>);
 }
 
-template <is_packable TYPE>
-constexpr inline auto unpack(is_packing_source auto source, [[maybe_unused]] TYPE& result, std::source_location location = std::source_location::current());
+template<is_packable TYPE>
+constexpr inline auto
+unpack(is_packing_source auto source,
+       [[maybe_unused]] TYPE& result,
+       std::source_location location = std::source_location::current());
 
 template<is_packing_source SOURCE_TYPE, typename TYPE>
 constexpr inline auto
@@ -138,7 +141,7 @@ constexpr inline auto unpack(is_packing_source auto source, [[maybe_unused]] TYP
             if constexpr(std::integral<TYPE>) {
             auto partial_source = subrange(return_value,content_size) | std::views::transform([](auto byte) { return static_cast<uint8_t>(byte); });
             result = std::accumulate(std::begin(partial_source), std::end(partial_source), TYPE{0}, [](TYPE value, auto next) {
-                return value << 8 + next;
+                return (value << 8) + static_cast<std::uint8_t>(next);
             });
             return_value = return_value.advance(content_size);
             } else {
@@ -147,7 +150,7 @@ constexpr inline auto unpack(is_packing_source auto source, [[maybe_unused]] TYP
         } else {
             auto data = std::array<std::byte, sizeof(TYPE)>{};
             std::ranges::copy(return_value | std::views::take(content_size), data.begin());
-            result = from_bytes<TYPE>(data);
+            result = from_bytes<TYPE, std::endian::big>(data);
             return_value = return_value.advance(content_size);
         }
     } else if (auto count_len = traits.count_length(); count_len > 0) {
@@ -157,13 +160,21 @@ constexpr inline auto unpack(is_packing_source auto source, [[maybe_unused]] TYP
         unpack_n(return_value, count, result);
     } else if (traits.content_size() <= sizeof(TYPE)) {
         if constexpr (std::is_arithmetic_v<TYPE>) {
-            result = from_bytes<TYPE>(return_value);
+            std::array<std::byte, sizeof(TYPE)> data{};
+            std::ranges::copy(return_value | std::views::take(sizeof(TYPE)), std::begin(data));
+            result = from_bytes<TYPE, std::endian::big>(data);
             return_value = return_value.advance(sizeof(TYPE));
         } else {
             throw "not implemented yet";
         }
     }
     return return_value;
+}
+
+template <typename TYPE, std::size_t SIZE>
+TYPE from_bytes(std::span<std::byte, SIZE> source) {
+    std::array<std::byte, SIZE> data;
+    return from_bytes<TYPE>(std::ranges::copy(source, std::begin(data)));
 }
 
 // NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers)
