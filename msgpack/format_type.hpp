@@ -151,7 +151,7 @@ struct spec {
     static constexpr std::uint8_t length = 0;
     static constexpr std::uint8_t bit_length = length * 8;
 
-    static constexpr auto acceptable_range(id_type format) { return std::pair{format, format}; }
+    static constexpr auto acceptable_id_range(id_type format) { return std::pair{format, format}; }
 };
 
 template <std::uint8_t BIT_SIZE, category_t CATEGORY>
@@ -170,7 +170,7 @@ template <std::uint8_t SPAN, category_t CATEGORY>
 struct range_spec : spec {
     static constexpr category_t category = CATEGORY;
 
-    static constexpr std::pair<id_type, id_type> acceptable_range(id_type format) { return {format, format + SPAN }; } 
+    static constexpr std::pair<id_type, id_type> acceptable_id_range(id_type format) { return {format, format + SPAN }; } 
 };
 
 template <auto VALUE>
@@ -193,7 +193,7 @@ struct traits
     static constexpr auto category = spec_type::category;
     static constexpr auto type = TYPE;
     static constexpr auto format = BASE_ID;
-    static constexpr auto id_range = spec_type::acceptable_range(format);
+    static constexpr auto id_range = spec_type::acceptable_id_range(format);
 
     id_type actual;
 
