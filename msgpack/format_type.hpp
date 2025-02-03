@@ -228,14 +228,25 @@ struct traits
         }
     }();
 
+    static constexpr auto length_size = []() {
+        if constexpr (is(FIXED)) {
+            return 0uz;
+        } else if constexpr (is(CONTAINER) || is(BINARY)) {
+            return spec_length;
+        } else {
+            return std::false_type{};
+        }
+    }();
+
     constexpr auto content_size() const {
         if constexpr (is(FIXED)) {
             return actual.value() - format.value();
+        } else if constexpr (is(CONTAINER)) {
+            return 0uz;
         } else {
-            return SPEC::length;
+            return spec_length;
         }
     };
-
 
     template<is_packable T>
     static constexpr bool accepts_type =

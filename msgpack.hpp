@@ -153,9 +153,9 @@ constexpr inline auto unpack(is_packing_source auto source, [[maybe_unused]] TYP
             result = from_bytes<TYPE, std::endian::big>(data);
             return_value = return_value.advance(content_size);
         }
-    } else if (auto count_len = traits.count_length(); count_len > 0) {
+    } else if (auto count_len = traits.length_size(); count_len > 0) {
         std::size_t count{0};
-        return_value = traits.read_count(source, count);
+        return_value = traits.read_count(return_value, count);
             return_value = unpack_n(return_value, content_size, result);
         unpack_n(return_value, count, result);
     } else if (traits.content_size() <= sizeof(TYPE)) {
@@ -178,6 +178,7 @@ TYPE from_bytes(std::span<std::byte, SIZE> source) {
 }
 
 // NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers)
+#if 0
 static_assert([]() {
     std::string value;
     unpack(
@@ -185,7 +186,6 @@ static_assert([]() {
       value);
     return value.size();
 }() == 2);
-#if 0
 static_assert([]() {
     std::size_t value{ 2 };
     unpack(

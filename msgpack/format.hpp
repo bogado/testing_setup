@@ -2,8 +2,10 @@
 #define INCLUDED_FORMAT_HPP
 
 #include "./format_type.hpp"
+#include <bits/ranges_algo.h>
 
 #include <cstddef>
+#include <numeric>
 #include <ranges>
 #include <source_location>
 #include <utility>
@@ -172,9 +174,9 @@ struct classification
         }, 0uz);
     }
 
-    constexpr auto count_length() const {
+    constexpr auto length_size() const {
         return visitor([]<typename TRAITS_T>(TRAITS_T) -> std::size_t {
-                return TRAITS_T::spec_length;
+                return TRAITS_T::length_size;
         }, 0);
     }
 
@@ -197,18 +199,22 @@ struct classification
     constexpr auto read_count(is_packing_source auto source, std::integral auto& count) const
     {
         auto result = std::ranges::subrange(source);
-        auto size = count_length();
-        if (count_length() == 0) {
+        auto size = length_size();
+        if (size == 0) {
             return result;
         }
 
-        count = 0;
-        for (auto value: source | std::views::take(size) |
-         std::views::transform([](std::byte value) { return
-             std::to_underlying(value); })) {
-            count += value;
-            count <<= 1;
-        }
+        auto source_view = source | std::views::take(size) |
+                                    std::views::transform([](std::byte value) {
+                                        return std::to_underlying(value);
+                                    });
+        count =
+          std::ranges::fold_left(source_view, 0,
+                                  [](std::size_t count, auto value) {
+                                      count <<= 8;
+                                      count += value;
+                                      return count;
+                                  });
         return result.advance(size);
     }
 
@@ -249,6 +255,8 @@ static_assert(classification{std::byte{0x93}}.accepts<std::array<int, 3>>());
 static_assert(classification{std::byte{0x93}}.accepts<std::array<unsigned, 3>>());
 static_assert(classification{std::byte{0xd9}}.traits.index() == 23);
 static_assert(classification{std::byte{0xcd}}.content_size() == 2);
+static_assert(classification{std::byte{0xd9}}.length_size() == 1);
+static_assert(classification{std::byte{0xd9}}.content_size() == 0);
 // NOLINTEND(cppcoreguidelines-avoid-magic-numbers)
 
 }

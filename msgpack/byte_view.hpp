@@ -1,7 +1,6 @@
 #ifndef INCLUDED_BYTE_VIEW_HPP
 #define INCLUDED_BYTE_VIEW_HPP
 
-#include "format_type.hpp"
 #include <algorithm>
 #include <array>
 #include <bit>
@@ -84,10 +83,8 @@ constexpr TYPE from_bytes(std::array<std::byte, SIZE> data)
 }
 
 // NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers)
-static_assert(from_bytes<std::string>(std::array{ std::byte{ 65 },
-                                                  std::byte{ 66 },
-                                                  std::byte{ 67 } }) ==
-              "ABC"); 
+static_assert(from_bytes<std::string>(std::array{std::byte{65}, std::byte{66},
+                                                 std::byte{67}}) == "ABC");
 // NOLINTEND(cppcoreguidelines-avoid-magic-numbers)
 }
 

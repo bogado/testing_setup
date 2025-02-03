@@ -1,13 +1,10 @@
 #ifndef INCLUDED_TYPES_HPP
 #define INCLUDED_TYPES_HPP
 
-#include "./byte_view.hpp"
-
 #include <sys/types.h>
 #include <any>
 #include <bit>
 #include <array>
-#include <compare>
 #include <concepts>
 #include <cstdint>
 #include <map>
@@ -15,7 +12,6 @@
 #include <string_view>
 #include <tuple>
 #include <type_traits>
-#include <utility>
 #include <variant>
 #include <vector>
 
@@ -35,34 +31,26 @@ enum class type_t : std::uint8_t
     NO_TYPE
 };
 
-template<type_t TYPE>
+template <type_t TYPE>
 using standard_type = std::conditional_t<
-  TYPE == type_t::INTEGER,
-  std::intmax_t,
-  std::conditional_t<
-    TYPE == type_t::FLOAT,
-    double,
+    TYPE == type_t::INTEGER, std::intmax_t,
     std::conditional_t<
-      TYPE == type_t::BOOL,
-      bool,
-      std::conditional_t<
-        TYPE == type_t::STR,
-        std::string,
+        TYPE == type_t::FLOAT, double,
         std::conditional_t<
-          TYPE == type_t::ARRAY,
-          std::vector<std::any>,
-          std::conditional_t<
-            TYPE == type_t::MAP,
-            std::map<std::any, std::any>,
+            TYPE == type_t::BOOL, bool,
             std::conditional_t<
-              TYPE == type_t::EXT,
-              std::any,
-              std::conditional_t<TYPE == type_t::BIN,
-                                 std::vector<std::byte>,
-                                 std::conditional<TYPE == type_t::VOID,
-                                                  std::nullptr_t,
-                                                  std::false_type>>>>>>>>>;
-
+                TYPE == type_t::STR, std::string,
+                std::conditional_t<
+                    TYPE == type_t::ARRAY, std::vector<std::any>,
+                    std::conditional_t<
+                        TYPE == type_t::MAP, std::map<std::any, std::any>,
+                        std::conditional_t<
+                            TYPE == type_t::EXT, std::any,
+                            std::conditional_t<
+                                TYPE == type_t::BIN, std::vector<std::byte>,
+                                std::conditional<TYPE == type_t::VOID,
+                                                 std::nullptr_t,
+                                                 std::false_type>>>>>>>>>;
 
 template <typename... TYPEs>
 constexpr auto variant_sizeof(std::variant<TYPEs...> var) 
@@ -166,12 +154,13 @@ template<typename PACKABLE>
 concept is_packable =
   is_array_like<PACKABLE> || is_map_like<PACKABLE> || is_str_like<PACKABLE> ||
   std::is_arithmetic_v<PACKABLE> || is_decomposable<PACKABLE>;
-}
 
 template <typename TARGET>
 concept is_packing_target = std::output_iterator<TARGET, std::byte>;
 
 template <typename SOURCE>
 concept is_packing_source = std::ranges::range<SOURCE> && std::same_as<std::ranges::range_value_t<SOURCE>, std::byte>;
+
+}
 
 #endif // INCLUDED_TYPES_HPP

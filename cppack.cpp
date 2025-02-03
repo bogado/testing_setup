@@ -10,7 +10,6 @@
 namespace message
 {
 
-
 enum class type : unsigned {
     REQUEST = 0,
     RESPONSE = 1,
@@ -38,7 +37,6 @@ struct payload {
 
     constexpr void pack(this auto&& self, auto &pack) {
         pack(static_cast<int>(self.type), self.id, self.name);
-        
     }
 };
 
@@ -87,11 +85,15 @@ requires( requires{ map.begin()->first; })
 int main(int, const char **)
 {
     // NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers)
-    std::cout << "string : " << test_unpack<std::string, 0xa3, 'A', 'b', 'C'>()
-              << "\n";
+    std::cout << "string : "
+            << test_unpack<std::string, 0xa3, 'A', 'b', 'C'>()
+            << "\n";
 
-    std::cout << "int : " << test_unpack<int, 0xcd, 0x01, 0x00>() << "\n";
-    std::cout << "float : " << test_unpack<float, 0xca, 0x80, 0x00, 0x00>() << "\n";
+    std::cout << "int : " << test_unpack<int, 0xcd, 0x00, 0x01>() << "\n";
+    std::cout
+        << "float : "
+        << test_unpack<float, 0xca, 0x80, 0x00, 0x00>()
+        << "\n";
 
     std::cout << "array : "
               << test_unpack<std::array<int, 3>, 0x93, 0xff, 2, 3>()
