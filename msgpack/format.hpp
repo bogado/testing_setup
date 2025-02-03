@@ -5,7 +5,6 @@
 #include <bits/ranges_algo.h>
 
 #include <cstddef>
-#include <numeric>
 #include <ranges>
 #include <source_location>
 #include <utility>
