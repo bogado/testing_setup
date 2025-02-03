@@ -90,9 +90,10 @@ int main(int, const char **)
             << "\n";
 
     std::cout << "int : " << test_unpack<int, 0xcd, 0x00, 0x01>() << "\n";
+//  3F 80 00 00
     std::cout
         << "float : "
-        << test_unpack<float, 0xca, 0x80, 0x00, 0x00>()
+        << test_unpack<float, 0xca, 0x3f, 0x80, 0x00, 0x00>()
         << "\n";
 
     std::cout << "array : "
