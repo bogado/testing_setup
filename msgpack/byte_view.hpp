@@ -9,6 +9,7 @@
 #include <iterator>
 #include <ranges>
 #include <type_traits>
+#include <string>
 
 namespace vb {
 
@@ -63,12 +64,17 @@ requires(std::ranges::range<TYPE> &&
 constexpr TYPE from_bytes(std::span<std::byte, SIZE> data)
 {
     static constexpr auto type_size = sizeof(TYPE);
+    static constexpr auto count = SIZE / type_size;
+
     TYPE result{};
     result.reserve(SIZE/type_size);
 
-    std::ranges::copy(data | std::views::chunk(type_size) | std::views::transform([](auto& view) {
-        return from_bytes<std::ranges::range_value_t<TYPE>>(std::span<std::byte, type_size>{std::begin(view), std::end(view)});
-    }), std::back_insert_iterator{result});
+    unsigned n = 0;
+    while(n <= count) {
+        auto partition = data | std::views::drop(n*type_size) | std::views::take(type_size); 
+         result.push_back(from_bytes<std::ranges::range_value_t<TYPE>>(std::span<std::byte, type_size>{std::begin(partition), std::end(partition)}));
+          n++;
+    }
     return result;   
 }
 
