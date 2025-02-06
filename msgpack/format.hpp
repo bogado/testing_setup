@@ -2,7 +2,6 @@
 #define INCLUDED_FORMAT_HPP
 
 #include "./format_type.hpp"
-#include <algorithm>
 
 #include <cstddef>
 #include <ranges>
