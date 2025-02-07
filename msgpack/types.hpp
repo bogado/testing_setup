@@ -31,6 +31,11 @@ enum class type_t : std::uint8_t
     NO_TYPE
 };
 
+constexpr bool is_valid(type_t type)
+{
+    return type != type_t::NO_TYPE;
+}
+
 template <type_t TYPE>
 using standard_type = std::conditional_t<
     TYPE == type_t::INTEGER, std::intmax_t,

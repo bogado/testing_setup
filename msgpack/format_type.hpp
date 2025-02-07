@@ -2,13 +2,14 @@
 #define INCLUDED_FORMAT_TYPE_HPP
 
 #include "./types.hpp"
+#include "./format_id.hpp"
 
 #include <concepts>
 #include <cstdint>
-#include <ostream>
+#include <sys/types.h>
 #include <utility>
 
-namespace vb::msgpack {
+namespace vb::msgpack::format {
 
 enum class category_t : std::uint16_t
 {
@@ -34,6 +35,8 @@ constexpr category_t operator&(
     if (a == category_t::UNKNOWN || b == category_t::UNKNOWN) {
         return category_t::UNKNOWN;
     }
+    if (a == category_t::NO_CATEGORY) { return b; }
+    if (b == category_t::NO_CATEGORY) { return a; }
 
     return category_t{ static_cast<uint8_t>(std::to_underlying(a) bitand
         std::to_underlying(b)) };
@@ -46,9 +49,11 @@ constexpr category_t operator|(
     if (a == category_t::UNKNOWN || b == category_t::UNKNOWN) {
         return category_t::UNKNOWN;
     }
+    if (a == category_t::NO_CATEGORY) { return b; }
+    if (b == category_t::NO_CATEGORY) { return a; }
 
-    return category_t{ static_cast<uint8_t>(std::to_underlying(a) bitor
-        std::to_underlying(b)) };
+    return category_t{static_cast<uint8_t>(std::to_underlying(a) bitor
+        std::to_underlying(b))};
 }
 
 constexpr bool is_valid(category_t category)
@@ -57,133 +62,52 @@ constexpr bool is_valid(category_t category)
         && category != category_t::UNKNOWN;
 }
 
-constexpr bool is_valid(type_t type)
-{
-    return type != type_t::NO_TYPE;
+namespace test {
+constexpr static auto test = category_t::VALUE | category_t::NUMERIC | category_t::UNSIGNED;
+static_assert(is_valid(test & category_t::VALUE));
 }
 
-namespace format {
-
-struct id_type {
-    std::byte ident;
-
-    constexpr id_type() = default;
-
-    constexpr id_type(std::byte v)
-        : ident{v}
-    {}
-
-    constexpr id_type(std::uint8_t v)
-      : ident{ v }
-    {}
-
-    struct reach_t {
-        std::uint8_t length;
-    };
-
-    constexpr std::uint8_t value() const
-    {
-        return static_cast<uint8_t>(ident);
-    }
-
-    constexpr id_type &operator +=(std::int8_t increment)
-    {
-        ident = static_cast<std::byte>(value() + increment);
-        return *this;
-    }
-
-    constexpr id_type operator +(std::int8_t increment) const
-    {
-        return id_type{static_cast<std::uint8_t>(value() + increment)};
-    }
-
-    constexpr id_type operator ++(int)
-    {
-        id_type other = *this;
-        *this += 1;
-        return other;
-    }
-
-    constexpr id_type &operator ++()
-    {
-        *this += 1;
-        return *this;
-    }
-
-    constexpr id_type operator++() const {
-        return *this + 1;
-    }
-
-    constexpr id_type middle(id_type other) const {
-        return id_type{static_cast<std::byte>(value() + other.value()/2)};
-    }
-
-    constexpr bool inside(std::pair<id_type, id_type> range) {
-        return value() >= range.first.value() &&
-               value() <= range.second.value();
-    }
-
-    template<typename VALUE_T>
-        requires(sizeof(VALUE_T) == 1)
-    struct directValue
-    {
-        using value_type = VALUE_T;
-        value_type value;
-    };
-
-    template<typename VALUE_T>
-    requires (sizeof(VALUE_T) == 1) 
-    constexpr id_type(id_type predecessor, directValue<VALUE_T> val, VALUE_T value) :
-        ident{predecessor.value() + value -
-            val.value()}
-    {}
-
-    constexpr bool operator==(const id_type&) const = default;
-    constexpr bool operator!=(const id_type&) const = default;
-
-    friend std::ostream& operator <<(std::ostream& out, id_type id) {
-        return out << "ID{" << std::hex << id.value() << "}";
-    }
+template <typename SPEC>
+concept is_spec = requires {
+    { SPEC::category } -> std::convertible_to<category_t>;
+    { SPEC::length } -> std::convertible_to<std::size_t>;
+    { SPEC::format } -> std::same_as<const id_type&>;
+    { SPEC::id_range } -> std::same_as<const std::pair<id_type, id_type>&>;
 };
 
+template <id_type ID, std::size_t LENGTH, category_t CATEGORY, std::uint8_t MAX_RANGE = 0>
 struct spec {
-    static constexpr category_t category = category_t::UNKNOWN;
-    static constexpr std::uint8_t length = 0;
-    static constexpr std::uint8_t bit_length = length * 8;
-
-    static constexpr auto acceptable_id_range(id_type format) { return std::pair{format, format}; }
+   static constexpr category_t category = CATEGORY;
+   static constexpr std::uint8_t length = LENGTH;
+   static constexpr auto format = ID;
+   static constexpr auto id_range = std::pair<id_type, id_type>{ format, format + MAX_RANGE};
 };
 
-template <std::uint8_t BIT_SIZE, category_t CATEGORY>
-struct bit_spec : spec {
-    static constexpr category_t category = CATEGORY;
-    static constexpr std::uint8_t length = BIT_SIZE / 8;
-};
+template <id_type ID, std::uint8_t BIT_SIZE, category_t CATEGORY>
+requires (BIT_SIZE % 8 == 0)
+using bit_spec = spec<ID, BIT_SIZE/8, CATEGORY>;
 
-template <std::uint8_t BYTE_SIZE, category_t CATEGORY>
-struct byte_spec : spec {
-    static constexpr category_t category = CATEGORY;
-    static constexpr std::uint8_t length = BYTE_SIZE;
-};
+static_assert(is_spec<bit_spec<id_type{0}, 8, category_t::NO_CATEGORY>>);
 
-template <std::uint8_t SPAN, category_t CATEGORY>
-struct range_spec : spec {
-    static constexpr category_t category = CATEGORY;
+template <id_type ID, std::uint8_t SPAN, category_t CATEGORY>
+using range_spec = spec<ID, 0, CATEGORY, SPAN>;
 
-    static constexpr std::pair<id_type, id_type> acceptable_id_range(id_type format) { return {format, format + SPAN }; } 
-};
+template <id_type ID, std::uint8_t SPAN, category_t CATEGORY>
+using fixed_size_container = spec<ID, 0, CATEGORY, SPAN>;
 
-template <auto VALUE>
-struct value_spec : spec {
-    static constexpr auto category = category_t::VALUE | category_t::STATIC;
+template <id_type ID>
+using nil_spec = spec<ID, 0, category_t::NO_CATEGORY>;
+
+template <id_type ID, auto VALUE>
+struct value_spec : spec<ID, 0, category_t::VALUE> {
     static constexpr auto value = VALUE;
 };
 
 namespace test { using enum category_t; 
-static_assert(bit_spec<16, NO_CATEGORY>::length == byte_spec<2, NO_CATEGORY>::length);
+static_assert(bit_spec<id_type{0}, 16, NO_CATEGORY>::length == 2);
 }
 
-template <type_t TYPE, std::derived_from<spec> SPEC, id_type BASE_ID>
+template <type_t TYPE, is_spec SPEC>
 struct traits
 {
     using enum category_t;
@@ -192,8 +116,9 @@ struct traits
 
     static constexpr auto category = spec_type::category;
     static constexpr auto type = TYPE;
-    static constexpr auto format = BASE_ID;
-    static constexpr auto id_range = spec_type::acceptable_id_range(format);
+    static constexpr auto format = spec_type::format;
+    static constexpr auto id_range = spec_type::id_range;
+
 
     id_type actual;
 
@@ -280,6 +205,5 @@ struct traits
     }
 };
 
-}
 }
 #endif // 

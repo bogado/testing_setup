@@ -2,8 +2,12 @@
 #define INCLUDED_FORMAT_HPP
 
 #include "./format_type.hpp"
+#include "format_id.hpp"
 
+#include <algorithm>
+#include <concepts>
 #include <cstddef>
+#include <iterator>
 #include <ranges>
 #include <source_location>
 #include <utility>
@@ -17,48 +21,48 @@ struct classification
     using enum category_t;
 
     // NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers)
-    using POSITIVE_FIX_INT = format::traits<INTEGER, range_spec<0x7f, VALUE | NUMERIC | UNSIGNED>, id_type{0}>;
-    using FIX_MAP = format::traits<MAP, range_spec<0xf, CONTAINER | FIXED>, id_type{0x80}>;
-    using FIX_ARRAY = format::traits<ARRAY, range_spec<0xf, CONTAINER | FIXED>, id_type{0x90}>;
-    using FIX_STR = format::traits<STR, range_spec<0x1f, CONTAINER | FIXED>, id_type{0xa0}>;
-    using NIL = format::traits<VOID, spec, id_type{0xc0}>;
-    using UNUSED = format::traits<VOID, spec, id_type{0xc1}>;
-    using FALSE = format::traits<BOOL, value_spec<false>, id_type{0xc2}>;
-    using TRUE = format::traits<BOOL, value_spec<true>, id_type{0xc3}>;
-    using BIN_8 = format::traits<BIN, bit_spec<8, BINARY>, id_type{0xc4}>;
-    using BIN_16 = format::traits<BIN, bit_spec<16, BINARY >, id_type{0xc5}>;
-    using BIN_32 = format::traits<BIN, bit_spec<32, BINARY>, id_type{0xc6}>;
-    using EXT_8 = format::traits<EXT, bit_spec<8, BINARY>, id_type{0xc7}>;
-    using EXT_16 = format::traits<EXT, bit_spec<16, BINARY>, id_type{0xc8}>;
-    using EXT_32 = format::traits<EXT, bit_spec<32, BINARY>, id_type{0xc9}>;
-    using FLOAT_32 = format::traits<FLOAT, bit_spec<32, NUMERIC>, id_type{0xca}>;
-    using FLOAT_64 = format::traits<FLOAT, bit_spec<64, NUMERIC>, id_type{0xcb}>;
-    using UINT_8 = format::traits<INTEGER, bit_spec<8,  NUMERIC | UNSIGNED>, id_type{0xcc}>;
-    using UINT_16 = format::traits<INTEGER, bit_spec<16, NUMERIC | UNSIGNED>, id_type{0xcd}>;
-    using UINT_32 = format::traits<INTEGER, bit_spec<32, NUMERIC | UNSIGNED>, id_type{0xce}>;
-    using UINT_64 = format::traits<INTEGER, bit_spec<8, NUMERIC | UNSIGNED>, id_type{0xcf}>;
+    using POSITIVE_FIX_INT = format::traits<INTEGER, range_spec<id_type{0}, 0x7f, VALUE | NUMERIC | UNSIGNED>>;
+    using FIX_MAP = format::traits<MAP, range_spec<id_type{0x80}, 0xf, CONTAINER | FIXED>>;
+    using FIX_ARRAY = format::traits<ARRAY, range_spec<id_type{0x90}, 0xf, CONTAINER | FIXED>>;
+    using FIX_STR = format::traits<STR, range_spec<id_type{0xa0}, 0x1f, CONTAINER | FIXED>>;
+    using NIL = format::traits<VOID, value_spec<id_type{0xc0}, nullptr>>;
+    using UNUSED = format::traits<VOID, nil_spec<id_type{0xc1}>>;
+    using FALSE = format::traits<BOOL, value_spec<id_type{0xc2}, false>>;
+    using TRUE = format::traits<BOOL, value_spec<id_type{0xc3}, true>>;
+    using BIN_8 = format::traits<BIN, bit_spec<id_type{0xc4}, 8, BINARY>>;
+    using BIN_16 = format::traits<BIN, bit_spec<id_type{0xc5}, 16, BINARY >>;
+    using BIN_32 = format::traits<BIN, bit_spec<id_type{0xc6}, 32, BINARY>>;
+    using EXT_8 = format::traits<EXT, bit_spec<id_type{0xc7}, 8, BINARY>>;
+    using EXT_16 = format::traits<EXT, bit_spec<id_type{0xc8}, 16, BINARY>>;
+    using EXT_32 = format::traits<EXT, bit_spec<id_type{0xc9}, 32, BINARY>>;
+    using FLOAT_32 = format::traits<FLOAT, bit_spec<id_type{0xca}, 32, NUMERIC>>;
+    using FLOAT_64 = format::traits<FLOAT, bit_spec<id_type{0xcb}, 64, NUMERIC>>;
+    using UINT_8 = format::traits<INTEGER, bit_spec<id_type{0xcc}, 8,  NUMERIC | UNSIGNED>>;
+    using UINT_16 = format::traits<INTEGER, bit_spec<id_type{0xcd}, 16, NUMERIC | UNSIGNED>>;
+    using UINT_32 = format::traits<INTEGER, bit_spec<id_type{0xce}, 32, NUMERIC | UNSIGNED>>;
+    using UINT_64 = format::traits<INTEGER, bit_spec<id_type{0xcf}, 8, NUMERIC | UNSIGNED>>;
     using INT_8 =
-      format::traits<INTEGER, bit_spec<8, NUMERIC>, id_type{0xd0}>;
+      format::traits<INTEGER, bit_spec<id_type{0xd0}, 8, NUMERIC>>;
     using INT_16 =
-      format::traits<INTEGER, bit_spec<16, NUMERIC>, id_type{0xd1}>;
+      format::traits<INTEGER, bit_spec<id_type{0xd1}, 16, NUMERIC>>;
     using INT_32 =
-      format::traits<INTEGER, bit_spec<32, NUMERIC>, id_type{0xd2}>;
+      format::traits<INTEGER, bit_spec<id_type{0xd2}, 32, NUMERIC>>;
     using INT_64 =
-      format::traits<INTEGER, bit_spec<64, NUMERIC>, id_type{0xd3}>;
-    using FIXEXT_1 = format::traits<EXT, byte_spec<1, STATIC>, id_type{0xd4}>;
-    using FIXEXT_2 = format::traits<EXT, byte_spec<2, STATIC>, id_type{0xd5}>;
-    using FIXEXT_4 = format::traits<EXT, byte_spec<4, STATIC>, id_type{0xd6}>;
-    using FIXEXT_8 = format::traits<EXT, byte_spec<8, STATIC>, id_type{0xd7}>;
-    using FIXEXT_16 = format::traits<EXT, byte_spec<16, STATIC>, id_type{0xd8}>;
-    using STR_8 = format::traits<STR, bit_spec<8, CONTAINER>, id_type{0xd9}>;
-    using STR_16 = format::traits<STR, bit_spec<16, CONTAINER>, id_type{0xda}>;
-    using STR_32 = format::traits<STR, bit_spec<32, CONTAINER>, id_type{0xdb}>;
-    using ARRAY_16 = format::traits<ARRAY, bit_spec<16, CONTAINER>, id_type{0xdc}>;
-    using ARRAY_32 = format::traits<ARRAY, bit_spec<32, CONTAINER>, id_type{0xdd}>;
-    using MAP_16 = format::traits<MAP, bit_spec<16, CONTAINER>, id_type{0xde}>;
-    using MAP_32 = format::traits<MAP, bit_spec<32, CONTAINER>, id_type{0xdf}>;
+      format::traits<INTEGER, bit_spec<id_type{0xd3}, 64, NUMERIC>>;
+    using FIXEXT_1 = format::traits<EXT, spec<id_type{0xd4}, 1, STATIC>>;
+    using FIXEXT_2 = format::traits<EXT, spec<id_type{0xd5}, 2, STATIC>>;
+    using FIXEXT_4 = format::traits<EXT, spec<id_type{0xd6}, 4, STATIC>>;
+    using FIXEXT_8 = format::traits<EXT, spec<id_type{0xd7}, 8, STATIC>>;
+    using FIXEXT_16 = format::traits<EXT, spec<id_type{0xd8}, 16, STATIC>>;
+    using STR_8 = format::traits<STR, bit_spec<id_type{0xd9}, 8, CONTAINER>>;
+    using STR_16 = format::traits<STR, bit_spec<id_type{0xda}, 16, CONTAINER>>;
+    using STR_32 = format::traits<STR, bit_spec<id_type{0xdb}, 32, CONTAINER>>;
+    using ARRAY_16 = format::traits<ARRAY, bit_spec<id_type{0xdc}, 16, CONTAINER>>;
+    using ARRAY_32 = format::traits<ARRAY, bit_spec<id_type{0xdd}, 32, CONTAINER>>;
+    using MAP_16 = format::traits<MAP, bit_spec<id_type{0xde}, 16, CONTAINER>>;
+    using MAP_32 = format::traits<MAP, bit_spec<id_type{0xdf}, 32, CONTAINER>>;
     using NEGATIVE_FIX_INT =
-      format::traits<INTEGER, range_spec<0x1f, NUMERIC | VALUE>, id_type{0xe0}>;
+      format::traits<INTEGER, range_spec<id_type{0xe0}, 0x1f, NUMERIC | VALUE>>;
 
     // NOLINTEND(cppcoreguidelines-avoid-magic-numbers)
     using traits_type = std::variant<
@@ -102,10 +106,10 @@ struct classification
     using trait_num = std::variant_alternative_t<I, traits_type>;
 
     template <unsigned INDICE = 0>
-    constexpr traits_type traits_for(std::byte index)
+    constexpr traits_type traits_for(id_type index)
     {
         if constexpr (!std::same_as<trait_num<INDICE>, std::monostate>) {
-            if (trait_num<INDICE>::accepts(format::id_type{index})) {
+            if (trait_num<INDICE>::accepts(index)) {
                 return trait_num<INDICE>{id_type{index}};
             }
             return traits_for<INDICE+1>(index);
@@ -116,8 +120,14 @@ struct classification
 
     traits_type traits;
 
-    constexpr classification(std::byte val)
-      : traits{ traits_for(val) }
+    explicit constexpr classification(id_type val)
+      : traits{traits_for(val) }
+    {}
+
+    template<typename T>
+    requires(std::constructible_from<id_type, T>)
+    explicit constexpr classification(T val)
+        : classification{id_type{val}}
     {}
 
     template<typename INVOCABLE_T, typename RESULT_T>
@@ -232,30 +242,33 @@ struct classification
 };
 
 // NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers)
-static_assert(classification::POSITIVE_FIX_INT::is(classification::VALUE));
-static_assert(!classification::POSITIVE_FIX_INT::is(classification::STATIC));
+namespace test {
+using namespace format::literals;
+static_assert(classification::POSITIVE_FIX_INT::is(category_t::VALUE));
+static_assert(!classification::POSITIVE_FIX_INT::is(category_t::STATIC));
 static_assert(classification::POSITIVE_FIX_INT::id_range.first.value() == 0);
 static_assert(classification::POSITIVE_FIX_INT::id_range.second.value() == 0x7f);
-static_assert(classification::POSITIVE_FIX_INT::accepts(3));
-static_assert(!classification::POSITIVE_FIX_INT::accepts(130));
-static_assert(classification::NEGATIVE_FIX_INT{0xff}.value() == -1);
+static_assert(classification::POSITIVE_FIX_INT::accepts(3_id));
+static_assert(!classification::POSITIVE_FIX_INT::accepts(130_id));
+static_assert(classification::NEGATIVE_FIX_INT{0xff_id}.value() == -1);
 static_assert(classification::NEGATIVE_FIX_INT::id_range.first.value() == 0xe0);
 static_assert(classification::NEGATIVE_FIX_INT::id_range.second.value() == 0xff);
-static_assert(classification::NEGATIVE_FIX_INT::accepts(0xff));
-static_assert(classification::FALSE::accepts(0xc2));
-static_assert(classification::FIX_STR::accepts(0xa2));
-static_assert(classification{std::byte{0xa2}}.is(classification::STR));
-static_assert(classification{std::byte{0xa2}}.content_size() == 2);
+static_assert(classification::NEGATIVE_FIX_INT::accepts(id_type{0xff}));
+static_assert(classification::FALSE::accepts(0xc2_id));
+static_assert(classification::FIX_STR::accepts(0xa2_id));
+static_assert(classification{id_type{0xa2}}.is(classification::STR));
+static_assert(classification{id_type{0xa2}}.content_size() == 2);
 static_assert(classification::FIX_ARRAY::is(classification::CONTAINER));
 static_assert(classification::FIX_ARRAY::is(classification::FIXED));
-static_assert(classification{std::byte{0x93}}.content_size() == 3);
-static_assert(classification{std::byte{0x93}}.accepts<std::array<int, 3>>());
-static_assert(classification{std::byte{0x93}}.accepts<std::array<unsigned, 3>>());
-static_assert(classification{std::byte{0xd9}}.traits.index() == 23);
-static_assert(classification{std::byte{0xcd}}.content_size() == 2);
-static_assert(classification{std::byte{0xd9}}.length_size() == 1);
-static_assert(classification{std::byte{0xd9}}.content_size() == 0);
+static_assert(classification{id_type{0x93}}.content_size() == 3);
+static_assert(classification{id_type{0x93}}.accepts<std::array<int, 3>>());
+static_assert(classification{id_type{0x93}}.accepts<std::array<unsigned, 3>>());
+static_assert(classification{id_type{0xd9}}.traits.index() == 23);
+static_assert(classification{id_type{0xcd}}.content_size() == 2);
+static_assert(classification{id_type{0xd9}}.length_size() == 1);
+static_assert(classification{id_type{0xd9}}.content_size() == 0);
 // NOLINTEND(cppcoreguidelines-avoid-magic-numbers)
+}
 
 }
 #endif // INCLUDED_FORMAT_HPP
