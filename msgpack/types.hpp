@@ -1,19 +1,19 @@
 #ifndef INCLUDED_TYPES_HPP
 #define INCLUDED_TYPES_HPP
 
-#include <sys/types.h>
-#include <any>
-#include <bit>
 #include <array>
+#include <bit>
 #include <concepts>
 #include <cstdint>
 #include <map>
 #include <ranges>
+#include <ranges>
+#include <string>
 #include <string_view>
 #include <tuple>
 #include <type_traits>
 #include <variant>
-#include <vector>
+#include <iterator>
 
 namespace vb::msgpack {
 
@@ -31,15 +31,15 @@ enum class type_t : std::uint8_t
     NO_TYPE
 };
 
+enum class direction 
+{
+    PACKING,   // From object to data
+    UNPACKING  // From data to object
+};
+
 constexpr bool is_valid(type_t type)
 {
     return type != type_t::NO_TYPE;
-}
-
-template <typename... TYPEs>
-constexpr auto variant_sizeof(std::variant<TYPEs...> var) 
-{
-    return std::visit([]<typename T>(T) { return sizeof(T); }, var);
 }
 
 template <typename T1, typename ... Ts>
@@ -73,38 +73,20 @@ template <int LEN>
 constexpr unsigned var_index = std::bit_width(bit_size<LEN>/8)-1;
 
 template<int LEN, bool IS_SIGNED = false>
-using integer = std::conditional_t<
+using integer_type = std::conditional_t<
   LEN == bit_size<LEN>,
   std::variant_alternative_t<
     var_index<LEN>,
     std::conditional_t<IS_SIGNED, int_value, unsigned_value>>,
   std::conditional_t<IS_SIGNED, int, unsigned>>;
 
-static_assert(std::same_as<integer<64>, std::uint64_t>);
-static_assert(std::same_as<integer<32, true>, std::int32_t>);
+static_assert(std::same_as<integer_type<64>, std::uint64_t>);
+static_assert(std::same_as<integer_type<32, true>, std::int32_t>);
 
 template<unsigned LEN>
-using floating = std::variant_alternative_t<std::bit_width(LEN/64), float_value>;
+using floating_type = std::variant_alternative_t<std::bit_width(LEN/64), float_value>;
 
-static_assert(std::same_as<floating<32>, float>);
-
-template<std::uint8_t SIZE>
-struct ext {
-    std::byte type_spec;
-    std::array<std::byte, SIZE> data;
-};
-
-template<typename TYPE>
-concept is_str_like =
-  std::same_as<TYPE, std::string> || std::same_as<TYPE, std::string_view> ||
-  std::same_as<TYPE, const char *>;
-
-template<typename TYPE>
-concept is_numeric_like =
-    std::same_as<TYPE, int_value> ||
-    std::constructible_from<int_value, TYPE> ||
-    std::same_as<TYPE, float_value> ||
-    std::constructible_from<float_value, TYPE>; 
+static_assert(std::same_as<floating_type<32>, float>);
 
 template<typename CLASS_T>
 concept is_decomposable = requires(const CLASS_T val) {
@@ -112,38 +94,74 @@ concept is_decomposable = requires(const CLASS_T val) {
     { std::get<0>(val) };
 };
 
-template<typename MAP>
-concept is_map_like = std::ranges::range<MAP> && requires(const MAP& map) {
-            { map.begin()->first };
-            { map.begin()->second };
+template<typename TYPE>
+concept is_map = requires(std::map<std::string, int> load) {
+    typename TYPE::key_type;
+    typename TYPE::mapped_type;
 };
 
-static_assert(is_map_like<std::map<std::string, int>>);
+template <typename TYPE>
+concept is_packable = is_decomposable<TYPE> || std::is_fundamental_v<TYPE> || std::ranges::range<TYPE>;
 
-template<typename ARRAY>
-concept is_array_like =
-  is_decomposable<ARRAY> ||
-  (std::ranges::range<ARRAY> && !is_map_like<ARRAY> && !is_str_like<ARRAY>);
+template<type_t TYPE_VAL, is_packable TYPE>
+constexpr bool type_accepts = []() {
+    using enum type_t;
+    using enum direction;
+    switch (TYPE_VAL) {
+    case INTEGER:
+        return std::integral<TYPE>;
+    case BOOL:
+        return std::same_as<TYPE, bool>;
+    case FLOAT:
+        return std::floating_point<TYPE>;
+    case STR:
+        return std::same_as<TYPE, std::string> ||
+               std::same_as<TYPE, std::string_view> ||
+                                   std::same_as<TYPE, const char *>;
+    case ARRAY:
+        if constexpr (is_decomposable<TYPE>) {
+            return true;
+        } else {
+            return std::ranges::range<TYPE> && !is_map<TYPE>;
+        }
+    case MAP:
+        return is_map<TYPE>;
+    case BIN:
+        return std::is_trivially_copyable_v<TYPE>;
+    case VOID:
+        return std::default_initializable<TYPE>;
+    default:
+        return false;
+    }
+}();
 
-template<typename T>
-concept is_ext_like = false;
-
-template<typename BUFFER_LIKE>
-concept is_buffer_like =
-  is_array_like<BUFFER_LIKE> &&
-  std::same_as<std::make_unsigned_t<std::ranges::range_value_t<BUFFER_LIKE>>,
-               unsigned char>;
-
-template<typename PACKABLE>
-concept is_packable =
-  is_array_like<PACKABLE> || is_map_like<PACKABLE> || is_str_like<PACKABLE> ||
-  std::is_arithmetic_v<PACKABLE> || is_decomposable<PACKABLE>;
+template<is_packable TYPE>
+constexpr type_t type_of = []() {
+    using enum type_t;
+    for (auto [accepts, result] :
+         { std::pair{ type_accepts<INTEGER, TYPE>, INTEGER },
+           std::pair{ type_accepts<BOOL, TYPE>, BOOL },
+           std::pair{ type_accepts<FLOAT, TYPE>, FLOAT },
+           std::pair{ type_accepts<STR, TYPE>, STR },
+           std::pair{ type_accepts<ARRAY, TYPE>, ARRAY },
+           std::pair{ type_accepts<MAP, TYPE>, MAP },
+           std::pair{ type_accepts<EXT, TYPE>, EXT },
+           std::pair{ type_accepts<VOID, TYPE>, VOID },
+           std::pair{ type_accepts<BIN, TYPE>, BIN } }) {
+        if (accepts) {
+            return result;
+        }
+    }
+    return NO_TYPE;
+}();
 
 template <typename TARGET>
 concept is_packing_target = std::output_iterator<TARGET, std::byte>;
 
 template <typename SOURCE>
 concept is_packing_source = std::ranges::range<SOURCE> && std::same_as<std::ranges::range_value_t<SOURCE>, std::byte>;
+static_assert(type_accepts<type_t::STR, std::string>);
+static_assert(is_map<std::map<std::string, int>>);
 
 }
 

@@ -3,11 +3,11 @@
 
 #include "./format_type.hpp"
 #include "format_id.hpp"
+#include "types.hpp"
 
 #include <algorithm>
 #include <concepts>
 #include <cstddef>
-#include <iterator>
 #include <ranges>
 #include <source_location>
 #include <utility>
@@ -140,11 +140,7 @@ struct classification
           [invocable, default_value, &location]<typename ARGUMENT_T>(
             ARGUMENT_T value) -> RESULT_T {
               if constexpr (std::same_as<std::monostate, ARGUMENT_T>) {
-                  throw std::domain_error("Invalid traits setup.");
-              } else if constexpr (!std::invocable<INVOCABLE_T, ARGUMENT_T>) {
-                  throw std::logic_error(
-                    std::string("Invalid visitor ") + location.function_name() +
-                    " for id: " + std::to_string(ARGUMENT_T::format.value()));
+                  throw std::domain_error(std::string("Invalid traits setup : ") + location.function_name());
               } else if constexpr (std::same_as<
                                      std::invoke_result_t<INVOCABLE_T,
                                                           ARGUMENT_T>,
@@ -224,13 +220,6 @@ struct classification
                                       return count;
                                   });
         return result.advance(size);
-    }
-
-    template <is_packing_source SOURCE_T, is_packable OUT_TYPE>
-    constexpr auto read_data(is_packing_source auto source, OUT_TYPE& out_data) const
-    {
-        out_data = container_from_bytes<OUT_TYPE>(source);
-        return std::ranges::subrange(std::begin(source) + sizeof(OUT_TYPE), std::end(source));
     }
 
     template <is_packable TYPE>
