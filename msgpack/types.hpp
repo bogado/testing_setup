@@ -36,27 +36,6 @@ constexpr bool is_valid(type_t type)
     return type != type_t::NO_TYPE;
 }
 
-template <type_t TYPE>
-using standard_type = std::conditional_t<
-    TYPE == type_t::INTEGER, std::intmax_t,
-    std::conditional_t<
-        TYPE == type_t::FLOAT, double,
-        std::conditional_t<
-            TYPE == type_t::BOOL, bool,
-            std::conditional_t<
-                TYPE == type_t::STR, std::string,
-                std::conditional_t<
-                    TYPE == type_t::ARRAY, std::vector<std::any>,
-                    std::conditional_t<
-                        TYPE == type_t::MAP, std::map<std::any, std::any>,
-                        std::conditional_t<
-                            TYPE == type_t::EXT, std::any,
-                            std::conditional_t<
-                                TYPE == type_t::BIN, std::vector<std::byte>,
-                                std::conditional<TYPE == type_t::VOID,
-                                                 std::nullptr_t,
-                                                 std::false_type>>>>>>>>>;
-
 template <typename... TYPEs>
 constexpr auto variant_sizeof(std::variant<TYPEs...> var) 
 {
