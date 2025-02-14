@@ -2,8 +2,9 @@
 #define INCLUDED_FORMAT_HPP
 
 #include "./format_type.hpp"
-#include "format_id.hpp"
-#include "types.hpp"
+#include "./format_id.hpp"
+#include "./types.hpp"
+#include "./byte_view.hpp"
 
 #include <algorithm>
 #include <concepts>
@@ -130,7 +131,7 @@ struct classification
         : classification{id_type{val}}
     {}
 
-    template<typename INVOCABLE_T, typename RESULT_T>
+    template<typename RESULT_T, typename INVOCABLE_T>
     constexpr auto visitor(INVOCABLE_T invocable,
                            RESULT_T default_value,
                            std::source_location location [[maybe_unused]] =
@@ -172,9 +173,9 @@ struct classification
         }, false);
     }
 
-    constexpr auto content_size() const {
-        return visitor([]<typename TRAITS_T>(const TRAITS_T& t) {
-                return t.content_size();
+    constexpr auto content_size() const -> std::size_t {
+        return visitor([]<typename TRAITS_T>(const TRAITS_T& trait_instance) {
+                return trait_instance.content_size();
         }, 0uz);
     }
 
@@ -182,6 +183,13 @@ struct classification
         return visitor([]<typename TRAITS_T>(TRAITS_T) -> std::size_t {
                 return TRAITS_T::length_size;
         }, 0);
+    }
+
+    template <is_packable TYPE>
+    constexpr bool accepts() const {
+        return visitor([]<typename TRAITS_T>(TRAITS_T) -> bool {
+            return TRAITS_T::template accepts_type<TYPE>;
+        }, false);
     }
 
     constexpr auto is_value() const {
@@ -200,34 +208,6 @@ struct classification
         }, std::optional<int8_t>{});
     }
 
-    constexpr auto read_count(is_packing_source auto source, std::integral auto& count) const
-    {
-        auto result = std::ranges::subrange(source);
-        auto size = length_size();
-        if (size == 0) {
-            return result;
-        }
-
-        auto source_view = source | std::views::take(size) |
-                                    std::views::transform([](std::byte value) {
-                                        return std::to_underlying(value);
-                                    });
-        count =
-          std::ranges::fold_left(source_view, 0,
-                                  [](std::size_t count, auto value) {
-                                      count <<= 8;
-                                      count += value;
-                                      return count;
-                                  });
-        return result.advance(size);
-    }
-
-    template <is_packable TYPE>
-    constexpr bool accepts() const {
-        return visitor([]<typename TRAITS_T>(TRAITS_T) -> bool {
-            return TRAITS_T::template accepts_type<TYPE>;
-        }, false);
-    }
 };
 
 // NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers)
@@ -245,6 +225,7 @@ static_assert(classification::NEGATIVE_FIX_INT::id_range.second.value() == 0xff)
 static_assert(classification::NEGATIVE_FIX_INT::accepts(id_type{0xff}));
 static_assert(classification::FALSE::accepts(0xc2_id));
 static_assert(classification::FIX_STR::accepts(0xa2_id));
+static_assert(classification::FIX_STR::accepts_type<std::string>);
 static_assert(classification{id_type{0xa2}}.is(classification::STR));
 static_assert(classification{id_type{0xa2}}.content_size() == 2);
 static_assert(classification::FIX_ARRAY::is(classification::CONTAINER));
@@ -256,6 +237,8 @@ static_assert(classification{id_type{0xd9}}.traits.index() == 23);
 static_assert(classification{id_type{0xcd}}.content_size() == 2);
 static_assert(classification{id_type{0xd9}}.length_size() == 1);
 static_assert(classification{id_type{0xd9}}.content_size() == 0);
+static_assert(!classification::NIL::accepts_type<std::string>);
+static_assert(!classification::BIN_16::accepts_type<std::array<int, 2>>);
 // NOLINTEND(cppcoreguidelines-avoid-magic-numbers)
 }
 

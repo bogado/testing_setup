@@ -1,11 +1,11 @@
+#include "msgpack/reader.hpp"
+    
 #include <iostream>
 #include <ranges>
 #include <string>
 #include <cctype>
 #include <print>
-
-#include "./msgpack.hpp"
-#include "msgpack/types.hpp"
+#include <vector>
 
 namespace message
 {
@@ -43,9 +43,8 @@ struct payload {
 template <vb::msgpack::is_packable TYPE, std::uint8_t... DATA>
 TYPE test_unpack()
 {
-    TYPE result{};
-    vb::msgpack::unpack(std::array{std::byte{DATA}...}, result);
-    return result;
+    auto [result, _] = vb::msgpack::read<TYPE>(std::array{std::byte{DATA}...});
+    return result.value_or(TYPE{});
 }
 
 std::ostream& operator<<(std::ostream& out, const std::ranges::viewable_range auto& range)

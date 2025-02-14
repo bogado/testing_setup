@@ -178,5 +178,8 @@ struct traits
     }
 };
 
+template <typename TRAITS>
+concept is_traits = std::same_as<TRAITS, traits<TRAITS::type,typename TRAITS::spec_type>>;
+
 }
 #endif // 

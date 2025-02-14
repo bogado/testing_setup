@@ -20,32 +20,6 @@
 
 namespace vb::msgpack {
 
-namespace details {
-
-template <typename T>
-struct remove_all_const {
-    using type = std::remove_const_t<T>;
-};
-
-template <typename T1, typename T2>
-struct remove_all_const<std::pair<T1, T2>>
-{
-    using type = std::pair<std::remove_const_t<T1>, std::remove_const_t<T2>>;
-};
-
-template <typename... Ts>
-struct remove_all_const<std::tuple<Ts...>>
-{
-    using type = std::tuple<std::remove_const_t<Ts>...>;
-};
-
-template <typename T>
-using remove_all_const_t = remove_all_const<T>::type;
-
-static_assert(std::same_as <
-              remove_all_const_t<std::pair<const std::string, int>>,
-                                 std::pair<std::string, int>>);
-}
 
 template<is_packable TYPE>
 constexpr inline auto

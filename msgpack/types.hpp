@@ -4,6 +4,7 @@
 #include <array>
 #include <bit>
 #include <concepts>
+#include <cstddef>
 #include <cstdint>
 #include <map>
 #include <ranges>
@@ -89,10 +90,13 @@ using floating_type = std::variant_alternative_t<std::bit_width(LEN/64), float_v
 static_assert(std::same_as<floating_type<32>, float>);
 
 template<typename CLASS_T>
-concept is_decomposable = requires(const CLASS_T val) {
+concept is_tuple_like = requires(const CLASS_T val) {
     { std::tuple_size_v<CLASS_T> } -> std::unsigned_integral;
     { std::get<0>(val) };
 };
+
+template<typename CLASS_T>
+concept is_decomposable = is_tuple_like<CLASS_T>;
 
 template<typename TYPE>
 concept is_map = requires(std::map<std::string, int> load) {
@@ -127,9 +131,10 @@ constexpr bool type_accepts = []() {
     case MAP:
         return is_map<TYPE>;
     case BIN:
-        return std::is_trivially_copyable_v<TYPE>;
+        return std::is_trivially_copyable_v<TYPE> && !(
+            std::ranges::range<TYPE> || std::is_array_v<TYPE>);
     case VOID:
-        return std::default_initializable<TYPE>;
+        return std::constructible_from<TYPE, nullptr_t>;
     default:
         return false;
     }
@@ -159,7 +164,10 @@ template <typename TARGET>
 concept is_packing_target = std::output_iterator<TARGET, std::byte>;
 
 template <typename SOURCE>
-concept is_packing_source = std::ranges::range<SOURCE> && std::same_as<std::ranges::range_value_t<SOURCE>, std::byte>;
+concept is_packing_source = std::ranges::range<SOURCE> && std::same_as<std::ranges::range_value_t<SOURCE>, std::byte> && requires {
+    typename SOURCE::const_iterator;
+};
+
 static_assert(type_accepts<type_t::STR, std::string>);
 static_assert(is_map<std::map<std::string, int>>);
 
