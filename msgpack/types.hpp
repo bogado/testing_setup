@@ -134,7 +134,7 @@ constexpr bool type_accepts = []() {
         return std::is_trivially_copyable_v<TYPE> && !(
             std::ranges::range<TYPE> || std::is_array_v<TYPE>);
     case VOID:
-        return std::constructible_from<TYPE, nullptr_t>;
+        return std::constructible_from<TYPE, std::nullptr_t>;
     default:
         return false;
     }
