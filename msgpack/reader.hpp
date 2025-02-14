@@ -4,6 +4,7 @@
 #include "types.hpp"
 #include "format_type.hpp"
 #include "format.hpp"
+#include "byte_view.hpp"
 
 #include <algorithm>
 #include <concepts>
