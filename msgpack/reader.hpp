@@ -62,6 +62,9 @@ struct read_context {
     }
 
     constexpr read_context advance(std::size_t size) const {
+        if (size > static_cast<std::size_t>(std::distance(position, end_position))) {
+            return { end_position, end_position};
+        }
         return {std::next(position, size), end_position};
     }
 };
@@ -138,7 +141,7 @@ constexpr read_result<RANGE_T, SOURCE_T> read_all(read_context<SOURCE_T> source,
 
         using value_t = std::ranges::range_value_t<RANGE_T>;
         auto inserter = make_insert_iterator(result);
-        std::ranges::copy(std::ranges::iota_view(size) | std::views::transform([&source](auto _) mutable {
+        std::ranges::copy(std::ranges::iota_view{0uz, size} | std::views::transform([&source](auto _ [[maybe_unused]]) mutable {
             if constexpr (is_map<RANGE_T>) {
                 auto key_result = read<typename RANGE_T::key_type>(source);
                 auto mapped_result = read<typename RANGE_T::mapped_type>(key_result.context);
