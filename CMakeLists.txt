@@ -1,5 +1,11 @@
 cmake_minimum_required(VERSION 3.30)
-project(test_parser VERSION 0.1 LANGUAGES CXX)
+
+set(CMAKE_CUDA_ARCHITECTURES native)
+set(CMAKE_CUDA_HOST_COMPILER g++-14)
+set(CMAKE_CUDA_COMPILER nvcc)
+set(CMAKE_CUDA_STANDARD 20)
+
+project(test_parser VERSION 0.1 LANGUAGES CXX CUDA) 
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -20,4 +26,13 @@ foreach(SOURCE IN LISTS SOURCES)
     add_executable("${NAME}" "${SOURCE}")
     target_compile_features("${NAME}" PRIVATE cxx_std_23)
     target_link_libraries("${NAME}" PRIVATE test_setup)
+endforeach()
+
+# CUDA SUPPORT :
+file(GLOB SOURCES LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} *.cu)
+
+foreach(SOURCE IN LISTS SOURCES)
+    string(REGEX REPLACE "(.*)\.cu$" "\\1" NAME ${SOURCE})
+    message(STATUS "Adding target ${NAME}")
+    add_executable("${NAME}" "${SOURCE}")
 endforeach()
