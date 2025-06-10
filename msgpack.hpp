@@ -20,32 +20,6 @@
 
 namespace vb::msgpack {
 
-namespace details {
-
-template <typename T>
-struct remove_all_const {
-    using type = std::remove_const_t<T>;
-};
-
-template <typename T1, typename T2>
-struct remove_all_const<std::pair<T1, T2>>
-{
-    using type = std::pair<std::remove_const_t<T1>, std::remove_const_t<T2>>;
-};
-
-template <typename... Ts>
-struct remove_all_const<std::tuple<Ts...>>
-{
-    using type = std::tuple<std::remove_const_t<Ts>...>;
-};
-
-template <typename T>
-using remove_all_const_t = remove_all_const<T>::type;
-
-static_assert(std::same_as <
-              remove_all_const_t<std::pair<const std::string, int>>,
-                                 std::pair<std::string, int>>);
-}
 
 template<is_packable TYPE>
 constexpr inline auto
@@ -53,12 +27,13 @@ unpack(is_packing_source auto source,
        [[maybe_unused]] TYPE& result,
        std::source_location location = std::source_location::current());
 
-template<is_packing_source SOURCE_TYPE, typename TYPE>
+template<is_packing_source SOURCE_TYPE, is_packable TYPE>
 constexpr inline auto
 unpack_n(const SOURCE_TYPE& source,
          std::unsigned_integral auto count,
          TYPE& result)
 {
+    using enum type_t;
     auto return_value = std::ranges::subrange(source);
     if constexpr (std::same_as<TYPE, std::string>) {
         auto source_view = source | std::views::take(count) |
@@ -66,7 +41,7 @@ unpack_n(const SOURCE_TYPE& source,
                              [](std::byte c) { return static_cast<char>(c); });
         std::ranges::copy(source_view, std::back_inserter(result));
         return_value = return_value.advance(std::size(result));
-    } else if constexpr (is_array_like<TYPE> || is_map_like<TYPE>) {
+    } else if constexpr (constexpr auto type = type_of<TYPE>; type == ARRAY || type == MAP) {
         if constexpr (requires {
                           { result.clear() };
                       }) {
@@ -83,7 +58,7 @@ unpack_n(const SOURCE_TYPE& source,
         auto output
           [[maybe_unused]] =
             [&](std::integral auto count [[maybe_unused]]) {
-                if constexpr (is_map_like<TYPE>) {
+                if constexpr (type_accepts<MAP, TYPE>) {
                     return std::inserter(result, std::end(result));
                 } else if constexpr (requires { result.push_back(value_type{}); }) {
                     return std::back_inserter(result);
@@ -99,7 +74,7 @@ unpack_n(const SOURCE_TYPE& source,
         std::ranges::generate_n(
           output(count), count, [&return_value]() -> value_type {
               value_type next{};
-              if constexpr (is_array_like<TYPE>) {
+              if constexpr (type_accepts<ARRAY, TYPE>) {
                   return_value = unpack(return_value, next);
               } else {
                   auto& [key, value] = next;
@@ -117,6 +92,7 @@ constexpr inline auto unpack(is_packing_source auto source, [[maybe_unused]] TYP
 {
     using namespace format;
     using std::ranges::subrange;
+    using enum type_t;
 
     auto return_value = subrange(source);
     auto traits = classification{ return_value.front() };
@@ -135,7 +111,7 @@ constexpr inline auto unpack(is_packing_source auto source, [[maybe_unused]] TYP
              "is_value is not compatible with this type");
         }
     } else if (auto content_size = traits.content_size(); content_size > 0) {
-        if constexpr (std::same_as<TYPE, std::string> || is_array_like<TYPE> || is_map_like<TYPE>) {
+        if constexpr (std::same_as<TYPE, std::string> || type_accepts<ARRAY, TYPE> || type_accepts<MAP, TYPE>) {
             return_value = unpack_n(return_value, content_size, result);
         } else if (traits.is(type_t::INTEGER)) {
             if constexpr(std::integral<TYPE>) {
@@ -177,34 +153,24 @@ TYPE from_bytes(std::span<std::byte, SIZE> source) {
     return from_bytes<TYPE>(std::ranges::copy(source, std::begin(data)));
 }
 
-// NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers)
-#if 0
-static_assert([]() {
-    std::string value;
-    unpack(
-      std::array{ std::byte{ 0xa2 }, std::byte{ 65 }, std::byte{ 66 } },
-      value);
-    return value.size();
-}() == 2);
-static_assert([]() {
-    std::size_t value{ 2 };
-    unpack(
-      std::array{ std::byte{ 0xcd }, std::byte{ 0x00 }, std::byte{ 0x01 } },
-      value);
-    return value;
-}() == 0x100);
-static_assert(
- []() {
-     std::array<int, 2> value;
-     constexpr auto expected = std::array<int, 2>{1, -1};
-     unpack(
-      std::array{ std::byte{ 0x92 }, std::byte{0x1}, std::byte{0xff} },
-      value);
-     auto [end1, end2] = std::ranges::mismatch(value, expected);
-     return end1 == value.end() && end2 == expected.end();
- }());
-#endif
-// NOLINTEND(cppcoreguidelines-avoid-magic-numbers)
+namespace test {
+template <typename TYPE, std::uint8_t... DATA>
+constexpr TYPE unpack_data() {
+    TYPE result{};
+    unpack(std::array{std::byte(DATA)...}, result);
+    return result;
+}
 
+// NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers)
+static_assert(unpack_data<std::string, 0xa2,  'a',  'b'>() == "ab");
+static_assert(unpack_data<std::string, 0xd9, 2,  'a',  'b'>() == "ab");
+static_assert(unpack_data<std::string, 0xda, 0, 2,  'a',  'b'>() == "ab");
+static_assert(unpack_data<int, 0xcd ,  0x00 ,  0x01 >() == 0x1);
+static constexpr auto expected = std::array{1, -1};
+static constexpr auto obtained = unpack_data<std::array<int, 2>, 0x92 , 0x1, 0xff>();
+static_assert(expected[0] == obtained[0]);
+static_assert(expected[1] == obtained[1]);
+// NOLINTEND(cppcoreguidelines-avoid-magic-numbers)
+}
 }
 #endif // INCLUDED_MSGPACK_HPP

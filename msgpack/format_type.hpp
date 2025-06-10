@@ -6,7 +6,6 @@
 
 #include <concepts>
 #include <cstdint>
-#include <sys/types.h>
 #include <utility>
 
 namespace vb::msgpack::format {
@@ -62,11 +61,6 @@ constexpr bool is_valid(category_t category)
         && category != category_t::UNKNOWN;
 }
 
-namespace test {
-constexpr static auto test = category_t::VALUE | category_t::NUMERIC | category_t::UNSIGNED;
-static_assert(is_valid(test & category_t::VALUE));
-}
-
 template <typename SPEC>
 concept is_spec = requires {
     { SPEC::category } -> std::convertible_to<category_t>;
@@ -87,8 +81,6 @@ template <id_type ID, std::uint8_t BIT_SIZE, category_t CATEGORY>
 requires (BIT_SIZE % 8 == 0)
 using bit_spec = spec<ID, BIT_SIZE/8, CATEGORY>;
 
-static_assert(is_spec<bit_spec<id_type{0}, 8, category_t::NO_CATEGORY>>);
-
 template <id_type ID, std::uint8_t SPAN, category_t CATEGORY>
 using range_spec = spec<ID, 0, CATEGORY, SPAN>;
 
@@ -103,10 +95,6 @@ struct value_spec : spec<ID, 0, category_t::VALUE> {
     static constexpr auto value = VALUE;
 };
 
-namespace test { using enum category_t; 
-static_assert(bit_spec<id_type{0}, 16, NO_CATEGORY>::length == 2);
-}
-
 template <type_t TYPE, is_spec SPEC>
 struct traits
 {
@@ -118,7 +106,6 @@ struct traits
     static constexpr auto type = TYPE;
     static constexpr auto format = spec_type::format;
     static constexpr auto id_range = spec_type::id_range;
-
 
     id_type actual;
 
@@ -138,19 +125,11 @@ struct traits
     }
 
     static constexpr auto spec_length = []() {
-        if constexpr (is(VALUE) || is(FIXED)) {
-            return 0;
-        } else {
-            return SPEC::length;
-        } 
+        return SPEC::length;
     }();
 
     static constexpr auto base_content_size = []() {
-        if constexpr (is(CONTAINER)) {
-            return 0;
-        } else {
-            return spec_length;
-        }
+        return spec_length;
     }();
 
     static constexpr auto length_size = []() {
@@ -173,14 +152,8 @@ struct traits
         }
     };
 
-    template<is_packable T>
-    static constexpr bool accepts_type =
-      (is(STR) && std::same_as<T, std::string>) ||
-      (is(INTEGER) && std::is_integral_v<T>) ||
-      (is(FLOAT) && std::is_floating_point_v<T>) ||
-      (is(BOOL) && std::same_as<T, bool>) || (is(ARRAY) && is_array_like<T>) ||
-      (is(MAP) && is_map_like<T>) || (is(EXT) && is_ext_like<T>) ||
-      (is(BIN) && is_buffer_like<T>) || (is(VOID) && std::is_null_pointer_v<T>);
+    template<typename T>
+    static constexpr bool accepts_type = type_accepts<type, T>;
 
     constexpr auto value() {
         if constexpr (is(VALUE)) {
@@ -204,6 +177,9 @@ struct traits
         return val.value() >= range.first && val.value() <= range.second;
     }
 };
+
+template <typename TRAITS>
+concept is_traits = std::same_as<TRAITS, traits<TRAITS::type,typename TRAITS::spec_type>>;
 
 }
 #endif // 
